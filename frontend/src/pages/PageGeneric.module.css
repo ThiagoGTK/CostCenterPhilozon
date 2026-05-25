@@ -154,3 +154,24 @@
   border: 1px solid var(--color-border);
   cursor: pointer;
 }
+
+.emptyRow {
+  text-align: center;
+  color: #94a3b8;
+  padding: 32px !important;
+}
+
+.loadingMsg {
+  padding: 24px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.errorMsg {
+  padding: 16px;
+  color: #dc2626;
+  font-size: 13px;
+  background: #fef2f2;
+  border-top: 1px solid #fecaca;
+}

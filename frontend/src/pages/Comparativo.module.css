@@ -1,3 +1,20 @@
 .right { text-align: right; }
 .positivo { color: var(--color-success); font-weight: 500; }
 .negativo { color: var(--color-danger); font-weight: 500; }
+
+.totaisBar {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.totaisBar span {
+  white-space: nowrap;
+}
+
+.totaisBar strong {
+  color: var(--color-text);
+  font-weight: 600;
+}

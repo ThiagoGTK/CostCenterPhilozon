@@ -62,8 +62,12 @@ class SIAExtractor:
     def __exit__(self, *_) -> None:
         self.disconnect()
 
-    def _query(self, sql: str, params: dict | None = None) -> pd.DataFrame:
-        """Executa query SELECT e retorna DataFrame."""
+    def _query(self, sql: str, params: tuple | None = None) -> pd.DataFrame:
+        """Executa query SELECT e retorna DataFrame.
+
+        params deve ser uma tupla com os valores posicionais para os '?' na query.
+        Não usar dict — o driver ODBC do Firebird usa placeholders posicionais.
+        """
         if not self._conn:
             raise RuntimeError("Não conectado ao SIA. Use 'with SIAExtractor(cfg):'")
         df = pd.read_sql(sql, self._conn, params=params)
@@ -89,21 +93,21 @@ class SIAExtractor:
         return self._query(SQL_CENTROS_CUSTO)
 
     def extrair_lancamentos_contabeis(self, ano: int, mes: int) -> pd.DataFrame:
-        """CTB_MOVIMENTOS — lançamentos contábeis de um período."""
+        """CTB_MOVIMENTOS — lançamentos contábeis de um período (apenas tipos 1=Déb e 2=Créd)."""
         from etl.queries.ctb import SQL_LANCAMENTOS
-        return self._query(SQL_LANCAMENTOS, {"codemp": self._cfg.sia_codemp, "ano": ano, "mes": mes})
+        return self._query(SQL_LANCAMENTOS, (self._cfg.sia_codemp, ano, mes))
 
     def extrair_contas_receber(self, ano: int, mes: int) -> pd.DataFrame:
-        """CRC_TITULO + CRC_TITULOPARC — contas a receber."""
+        """CRC_TITULO + CRC_TITULOPARC — contas a receber com parcelas."""
         from etl.queries.crc import SQL_CONTAS_RECEBER
-        return self._query(SQL_CONTAS_RECEBER, {"codemp": self._cfg.sia_codemp, "ano": ano, "mes": mes})
+        return self._query(SQL_CONTAS_RECEBER, (self._cfg.sia_codemp, ano, mes))
 
     def extrair_contas_pagar(self, ano: int, mes: int) -> pd.DataFrame:
-        """CPG_TITULO — contas a pagar."""
+        """CPG_TITULO + CPG_TITULOPARC — contas a pagar com parcelas."""
         from etl.queries.cpg import SQL_CONTAS_PAGAR
-        return self._query(SQL_CONTAS_PAGAR, {"codemp": self._cfg.sia_codemp, "ano": ano, "mes": mes})
+        return self._query(SQL_CONTAS_PAGAR, (self._cfg.sia_codemp, ano, mes))
 
     def extrair_receitas(self, ano: int, mes: int) -> pd.DataFrame:
-        """EST_VENDA / FIS_MOVIMENTO — receitas brutas."""
+        """FIS_MOVIMENTO — receitas brutas (NFs de saída)."""
         from etl.queries.fis import SQL_RECEITAS
-        return self._query(SQL_RECEITAS, {"codemp": self._cfg.sia_codemp, "ano": ano, "mes": mes})
+        return self._query(SQL_RECEITAS, (self._cfg.sia_codemp, ano, mes))

@@ -1,11 +1,25 @@
+/**
+ * Cliente HTTP centralizado + tipos de resposta da API FP&A.
+ */
+
 import axios from "axios";
 
 export const api = axios.create({
-  baseURL: "/api/v1",
+  baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1",
   headers: { "Content-Type": "application/json" },
 });
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
+
+export interface VersaoOrcamento {
+  id: number;
+  ano: number;
+  tipo: "ORIGINAL" | "REVISAO" | "FORECAST";
+  nome: string;
+  descricao?: string;
+  data_criacao: string;
+  bloqueada: boolean;
+}
 
 export interface CentroCusto {
   id: number;
@@ -28,14 +42,36 @@ export interface ContaGerencial {
   ativa: boolean;
 }
 
-export interface VersaoOrcamento {
+export interface ContaSia {
   id: number;
+  codpla: number;
+  conta_codigo: string;
+  conta_class?: string;
+  conta_nome: string;
+  conta_tipo?: string;
+  conta_nivel?: number;
+}
+
+export interface ComparativoItem {
+  mes: number;
+  conta_gerencial_codigo: string;
+  conta_gerencial_nome: string;
+  centro_custo_codigo: string;
+  centro_custo_nome: string;
+  valor_orcado: number;
+  valor_realizado: number;
+  variacao_percentual: number;
+}
+
+export interface ComparativoResponse {
   ano: number;
-  tipo: "ORIGINAL" | "REVISAO" | "FORECAST";
-  nome: string;
-  descricao?: string;
-  data_criacao: string;
-  bloqueada: boolean;
+  id_versao: number;
+  nome_versao: string;
+  itens: ComparativoItem[];
+  total_orcado: number;
+  total_realizado: number;
+  variacao_absoluta_total: number;
+  variacao_percentual_total: number;
 }
 
 export interface OrcamentoItem {
@@ -46,20 +82,8 @@ export interface OrcamentoItem {
   id_centro_custo: number;
   ano: number;
   mes: number;
-  valor: string;
+  valor: number;
   observacao?: string;
-}
-
-export interface ComparativoItem {
-  mes: number;
-  conta_gerencial_codigo: string;
-  conta_gerencial_nome: string;
-  centro_custo_codigo: string;
-  centro_custo_nome: string;
-  valor_orcado: string;
-  valor_realizado: string;
-  variacao_absoluta: string;
-  variacao_percentual: string;
 }
 
 export interface WorkflowItem {
@@ -76,22 +100,97 @@ export interface WorkflowItem {
   comentario?: string;
 }
 
+export interface MapeamentoConta {
+  id: number;
+  id_conta_sia: number;
+  id_conta_gerencial: number;
+  id_empresa: number;
+  ativo: boolean;
+  observacao?: string;
+  conta_sia?: ContaSia;
+}
+
+export interface MapeamentoCC {
+  id: number;
+  cc_sia_codigo: string;
+  cc_sia_nome?: string;
+  id_empresa: number;
+  id_centro_custo_gerencial: number;
+  ativo: boolean;
+  observacao?: string;
+}
+
 // ── API calls ──────────────────────────────────────────────────────────────
 
-export const getCentrosCusto = () =>
-  api.get<CentroCusto[]>("/centros-custo").then((r) => r.data);
+// Dimensões
+export const getCentrosCusto = (apenasAtivos = true) =>
+  api.get<CentroCusto[]>("/centros-custo/", { params: { apenas_ativos: apenasAtivos } }).then((r) => r.data);
 
-export const getContasGerenciais = () =>
-  api.get<ContaGerencial[]>("/contas-gerenciais").then((r) => r.data);
+export const getContasGerenciais = (params?: { tipo?: string; apenas_ativas?: boolean }) =>
+  api.get<ContaGerencial[]>("/contas-gerenciais/", { params }).then((r) => r.data);
+
+export const getContasSia = (params?: { codpla?: number; nivel?: number }) =>
+  api.get<ContaSia[]>("/contas-sia", { params }).then((r) => r.data);
 
 export const getVersoesOrcamento = (ano: number) =>
   api.get<VersaoOrcamento[]>(`/versoes-orcamento/${ano}`).then((r) => r.data);
 
-export const getOrcamento = (ano: number, idVersao: number) =>
-  api.get<OrcamentoItem[]>(`/orcamento/${ano}/${idVersao}`).then((r) => r.data);
+// Orçamento
+export const getOrcamento = (ano: number, idVersao: number, params?: { id_empresa?: number; id_centro_custo?: number }) =>
+  api.get<OrcamentoItem[]>(`/orcamento/${ano}/${idVersao}`, { params }).then((r) => r.data);
 
-export const getComparativo = (ano: number, idVersao: number) =>
-  api.get(`/comparativo/${ano}/${idVersao}`).then((r) => r.data);
+export const salvarOrcamento = (payload: {
+  id_empresa: number;
+  id_versao: number;
+  id_conta_gerencial: number;
+  id_centro_custo: number;
+  ano: number;
+  mes: number;
+  valor: number;
+  observacao?: string;
+}) => api.post<OrcamentoItem>("/orcamento/", payload).then((r) => r.data);
+
+// Comparativo
+export const getComparativo = (ano: number, idVersao: number, params?: { id_empresa?: number; id_centro_custo?: number }) =>
+  api.get<ComparativoResponse>(`/comparativo/${ano}/${idVersao}`, { params }).then((r) => r.data);
 
 export const getDRE = (ano: number, idVersao: number) =>
   api.get(`/dre/${ano}/${idVersao}`).then((r) => r.data);
+
+// Mapeamentos
+export const getMapeamentosContas = (idEmpresa?: number) =>
+  api.get<MapeamentoConta[]>("/mapeamentos/contas", {
+    params: idEmpresa != null ? { id_empresa: idEmpresa } : {},
+  }).then((r) => r.data);
+
+export const criarMapeamentoConta = (payload: {
+  id_conta_sia: number;
+  id_conta_gerencial: number;
+  id_empresa: number;
+  observacao?: string;
+}) => api.post<MapeamentoConta>("/mapeamentos/contas", payload).then((r) => r.data);
+
+export const atualizarMapeamentoConta = (id: number, payload: { id_conta_gerencial: number; observacao?: string }) =>
+  api.put<MapeamentoConta>(`/mapeamentos/contas/${id}`, payload).then((r) => r.data);
+
+export const desativarMapeamentoConta = (id: number) =>
+  api.delete(`/mapeamentos/contas/${id}`);
+
+export const getMapeamentosCC = (idEmpresa?: number) =>
+  api.get<MapeamentoCC[]>("/mapeamentos/centros-custo", {
+    params: idEmpresa != null ? { id_empresa: idEmpresa } : {},
+  }).then((r) => r.data);
+
+export const criarMapeamentoCC = (payload: {
+  cc_sia_codigo: string;
+  cc_sia_nome?: string;
+  id_empresa: number;
+  id_centro_custo_gerencial: number;
+  observacao?: string;
+}) => api.post<MapeamentoCC>("/mapeamentos/centros-custo", payload).then((r) => r.data);
+
+export const atualizarMapeamentoCC = (id: number, payload: { id_centro_custo_gerencial: number; cc_sia_nome?: string }) =>
+  api.put<MapeamentoCC>(`/mapeamentos/centros-custo/${id}`, payload).then((r) => r.data);
+
+export const desativarMapeamentoCC = (id: number) =>
+  api.delete(`/mapeamentos/centros-custo/${id}`);

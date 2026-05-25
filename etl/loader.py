@@ -8,6 +8,7 @@ Estratégia: INSERT ... ON CONFLICT DO UPDATE (upsert) usando a chave de negóci
 
 import logging
 from decimal import Decimal
+from datetime import date
 import pandas as pd
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -32,11 +33,13 @@ class DWLoader:
         """)
         with self._engine.begin() as conn:
             result = conn.execute(sql, df.to_dict("records"))
-        inserted = result.rowcount
-        logger.info("dim_tempo: %d registros inseridos", inserted)
-        return inserted
+        logger.info("dim_tempo: %d registros inseridos", result.rowcount)
+        return result.rowcount
 
     def upsert_dim_empresa(self, records: list[dict]) -> int:
+        """Chave: codemp. Atualiza nome, cnpj e ativa em conflito."""
+        if not records:
+            return 0
         sql = text("""
             INSERT INTO dw.dim_empresa (codemp, nome, cnpj, ativa)
             VALUES (:codemp, :nome, :cnpj, :ativa)
@@ -51,31 +54,147 @@ class DWLoader:
         return result.rowcount
 
     def upsert_dim_conta_sia(self, records: list[dict]) -> int:
-        """Chave de negócio: codemp + conta_codigo."""
+        """
+        Chave: (codpla, conta_codigo).
+        conta_codigo = CON_COD (inteiro como string).
+        conta_class  = CON_CLASS (código hierárquico legível).
+        """
+        if not records:
+            return 0
         sql = text("""
-            INSERT INTO dw.dim_conta_sia (codemp, conta_codigo, conta_nome, conta_tipo, conta_nivel)
-            VALUES (:codemp, :conta_codigo, :conta_nome, :conta_tipo, :conta_nivel)
-            ON CONFLICT (codemp, conta_codigo) DO UPDATE SET
-                conta_nome  = EXCLUDED.conta_nome,
-                conta_tipo  = EXCLUDED.conta_tipo,
-                conta_nivel = EXCLUDED.conta_nivel
+            INSERT INTO dw.dim_conta_sia
+                (codpla, conta_codigo, conta_class, conta_codsup,
+                 conta_nome, conta_tipo, conta_nivel)
+            VALUES
+                (:codpla, :conta_codigo, :conta_class, :conta_codsup,
+                 :conta_nome, :conta_tipo, :conta_nivel)
+            ON CONFLICT (codpla, conta_codigo) DO UPDATE SET
+                conta_class  = EXCLUDED.conta_class,
+                conta_codsup = EXCLUDED.conta_codsup,
+                conta_nome   = EXCLUDED.conta_nome,
+                conta_tipo   = EXCLUDED.conta_tipo,
+                conta_nivel  = EXCLUDED.conta_nivel
         """)
-        # TODO: adicionar constraint UNIQUE(codemp, conta_codigo) na migration
         with self._engine.begin() as conn:
             result = conn.execute(sql, records)
         logger.info("dim_conta_sia: %d registros processados", result.rowcount)
         return result.rowcount
+
+    def upsert_dim_cliente(self, records: list[dict]) -> int:
+        """Chave: (codemp, cod_sia)."""
+        if not records:
+            return 0
+        sql = text("""
+            INSERT INTO dw.dim_cliente (codemp, cod_sia, nome, cnpj_cpf, ativo)
+            VALUES (:codemp, :cod_sia, :nome, :cnpj_cpf, :ativo)
+            ON CONFLICT (codemp, cod_sia) DO UPDATE SET
+                nome     = EXCLUDED.nome,
+                cnpj_cpf = EXCLUDED.cnpj_cpf,
+                ativo    = EXCLUDED.ativo
+        """)
+        with self._engine.begin() as conn:
+            result = conn.execute(sql, records)
+        logger.info("dim_cliente: %d registros processados", result.rowcount)
+        return result.rowcount
+
+    def upsert_dim_fornecedor(self, records: list[dict]) -> int:
+        """Chave: cod_sia. GER_EMITENTES é cadastro global (sem CODEMP)."""
+        if not records:
+            return 0
+        sql = text("""
+            INSERT INTO dw.dim_fornecedor (cod_sia, nome, nome_fantasia, cnpj_cpf, ativo)
+            VALUES (:cod_sia, :nome, :nome_fantasia, :cnpj_cpf, :ativo)
+            ON CONFLICT (cod_sia) DO UPDATE SET
+                nome         = EXCLUDED.nome,
+                nome_fantasia = EXCLUDED.nome_fantasia,
+                cnpj_cpf     = EXCLUDED.cnpj_cpf,
+                ativo        = EXCLUDED.ativo
+        """)
+        with self._engine.begin() as conn:
+            result = conn.execute(sql, records)
+        logger.info("dim_fornecedor: %d registros processados", result.rowcount)
+        return result.rowcount
+
+    # ── Resolvedores de FK ─────────────────────────────────────────────────
+
+    def resolver_ids_empresa(self, codemp_list: list[int]) -> dict[int, int]:
+        """Retorna {codemp → id} para os codigos fornecidos."""
+        if not codemp_list:
+            return {}
+        sql = text("SELECT id, codemp FROM dw.dim_empresa WHERE codemp = ANY(:vals)")
+        with self._engine.connect() as conn:
+            rows = conn.execute(sql, {"vals": codemp_list}).fetchall()
+        return {row[1]: row[0] for row in rows}
+
+    def resolver_ids_tempo(self, datas: list[date]) -> dict[str, int]:
+        """Retorna {data_str → id} para as datas fornecidas."""
+        if not datas:
+            return {}
+        # Converter para string ISO para garantir comparação correta
+        datas_str = [d.isoformat() if hasattr(d, "isoformat") else str(d) for d in datas]
+        sql = text("SELECT id, data::text FROM dw.dim_tempo WHERE data::text = ANY(:vals)")
+        with self._engine.connect() as conn:
+            rows = conn.execute(sql, {"vals": datas_str}).fetchall()
+        return {row[1]: row[0] for row in rows}
+
+    def resolver_ids_conta_sia(self, conta_codigos: list[str]) -> dict[str, int]:
+        """
+        Retorna {conta_codigo → id}.
+        Como podem existir contas com mesmo CON_COD em planos diferentes,
+        retorna o primeiro match (plano mais recente = maior codpla).
+        """
+        if not conta_codigos:
+            return {}
+        sql = text("""
+            SELECT DISTINCT ON (conta_codigo) id, conta_codigo
+            FROM dw.dim_conta_sia
+            WHERE conta_codigo = ANY(:vals)
+            ORDER BY conta_codigo, codpla DESC
+        """)
+        with self._engine.connect() as conn:
+            rows = conn.execute(sql, {"vals": conta_codigos}).fetchall()
+        return {row[1]: row[0] for row in rows}
+
+    def resolver_mapeamentos_conta(self, id_empresa: int) -> dict[str, int]:
+        """
+        Retorna {conta_codigo → id_conta_gerencial} para mapeamentos ativos.
+        Usado pelo pipeline para popular id_conta_gerencial em fato_lancamento_realizado.
+        """
+        sql = text("""
+            SELECT cs.conta_codigo, m.id_conta_gerencial
+            FROM dw.mapeamento_conta_sia_gerencial m
+            JOIN dw.dim_conta_sia cs ON cs.id = m.id_conta_sia
+            WHERE m.id_empresa = :id_empresa
+              AND m.ativo = true
+        """)
+        with self._engine.connect() as conn:
+            rows = conn.execute(sql, {"id_empresa": id_empresa}).fetchall()
+        return {row[0]: row[1] for row in rows}
+
+    def resolver_mapeamentos_cc(self, id_empresa: int) -> dict[str, int]:
+        """
+        Retorna {cc_sia_codigo → id_centro_custo} para mapeamentos ativos.
+        Usado pelo pipeline para popular id_centro_custo em fato_lancamento_realizado.
+        """
+        sql = text("""
+            SELECT cc_sia_codigo, id_centro_custo_gerencial
+            FROM dw.mapeamento_centro_custo_sia_gerencial
+            WHERE id_empresa = :id_empresa
+              AND ativo = true
+        """)
+        with self._engine.connect() as conn:
+            rows = conn.execute(sql, {"id_empresa": id_empresa}).fetchall()
+        return {row[0]: row[1] for row in rows}
 
     # ── Fatos ──────────────────────────────────────────────────────────────
 
     def upsert_fato_lancamento_realizado(self, records: list[dict]) -> int:
         """
         Idempotência via sia_lancamento_id (chave única de negócio).
-        Em caso de conflito, atualiza o valor (re-run seguro após correção no SIA).
+        Em caso de conflito, atualiza valor e historico (corrigível no SIA).
         """
         if not records:
             return 0
-
         sql = text("""
             INSERT INTO dw.fato_lancamento_realizado
                 (id_empresa, id_tempo, id_conta_sia, id_conta_gerencial, id_centro_custo,

@@ -47,3 +47,13 @@ def atualizar_conta(id: int, payload: ContaGerencialCreate, db: Session = Depend
     db.commit()
     db.refresh(obj)
     return obj
+
+
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def desativar_conta(id: int, db: Session = Depends(get_db)):
+    """Soft delete — desativa a conta sem remover do banco."""
+    obj = db.get(DimContaGerencial, id)
+    if not obj:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conta gerencial não encontrada")
+    obj.ativa = False
+    db.commit()

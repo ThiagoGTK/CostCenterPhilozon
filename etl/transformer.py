@@ -50,6 +50,46 @@ def normalizar_valor_monetario(valor, tabela_campo: str = "") -> Decimal:
     return sia_decimal(valor)
 
 
+def transformar_empresas(df: pd.DataFrame) -> list[dict]:
+    """
+    Transforma GER_EMPRESAS para dim_empresa.
+    Colunas esperadas: EMP_COD, EMP_NOM, EMP_NOMFANT, EMP_CNPJCPF, EMP_ATIINA
+    """
+    if df.empty:
+        return []
+    records = []
+    for _, row in df.iterrows():
+        records.append({
+            "codemp": int(row["EMP_COD"]),
+            "nome":   str(row["EMP_NOM"] or row.get("EMP_NOMFANT") or ""),
+            "cnpj":   str(row["EMP_CNPJCPF"]).strip() if row["EMP_CNPJCPF"] else None,
+            "ativa":  str(row["EMP_ATIINA"]).upper() == "A",
+        })
+    return records
+
+
+def transformar_plano_contas(df: pd.DataFrame) -> list[dict]:
+    """
+    Transforma CTB_CONTAS para dim_conta_sia.
+    Colunas esperadas: CON_CODPLA, CON_COD, CON_CODSUP, CON_CLASS,
+                       CON_NIVEL, CON_TIPO, CON_DESC
+    """
+    if df.empty:
+        return []
+    records = []
+    for _, row in df.iterrows():
+        records.append({
+            "codpla":       int(row["CON_CODPLA"]),
+            "conta_codigo": str(int(row["CON_COD"])),
+            "conta_class":  str(row["CON_CLASS"]).strip() if row["CON_CLASS"] else None,
+            "conta_codsup": int(row["CON_CODSUP"]) if row["CON_CODSUP"] else None,
+            "conta_nome":   str(row["CON_DESC"] or "")[:200],
+            "conta_tipo":   str(row["CON_TIPO"]).strip() if row["CON_TIPO"] else None,
+            "conta_nivel":  int(row["CON_NIVEL"]) if row["CON_NIVEL"] else None,
+        })
+    return records
+
+
 def transformar_lancamentos_contabeis(df: pd.DataFrame) -> pd.DataFrame:
     """
     Transforma lançamentos contábeis do CTB_MOVIMENTOS.

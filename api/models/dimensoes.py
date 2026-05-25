@@ -71,17 +71,24 @@ class DimContaGerencial(Base):
 
 
 class DimContaSia(Base):
-    """Plano de contas contábil extraído do SIA (CTB_CONTAS)."""
+    """Plano de contas contábil extraído do SIA (CTB_CONTAS).
+
+    CTB_CONTAS não tem CODEMP — isolamento por CON_CODPLA (plano da empresa).
+    Philozon usa os planos 1 (2019) e 2 (2023).
+    conta_codigo = CON_COD (inteiro, chave interna do SIA).
+    conta_class  = CON_CLASS (código hierárquico legível, ex: "1.01.02.03").
+    """
     __tablename__ = "dim_conta_sia"
     __table_args__ = {"schema": "dw"}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    codemp: Mapped[int] = mapped_column(Integer, nullable=False)
-    conta_codigo: Mapped[str] = mapped_column(String(50), nullable=False)
-    conta_nome: Mapped[str] = mapped_column(String(200), nullable=False)
-    conta_tipo: Mapped[str | None] = mapped_column(String(10))
-    conta_nivel: Mapped[int | None] = mapped_column(SmallInteger)
-    # TODO: validar campos reais na tabela CTB_CONTAS do SIA
+    codpla: Mapped[int] = mapped_column(Integer, nullable=False, comment="CON_CODPLA — plano de contas")
+    conta_codigo: Mapped[str] = mapped_column(String(50), nullable=False, comment="CON_COD")
+    conta_class: Mapped[str | None] = mapped_column(String(50), comment="CON_CLASS — código hierárquico")
+    conta_codsup: Mapped[int | None] = mapped_column(Integer, comment="CON_CODSUP — conta pai")
+    conta_nome: Mapped[str] = mapped_column(String(200), nullable=False, comment="CON_DESC")
+    conta_tipo: Mapped[str | None] = mapped_column(String(10), comment="CON_TIPO")
+    conta_nivel: Mapped[int | None] = mapped_column(SmallInteger, comment="CON_NIVEL")
 
 
 class DimCliente(Base):
@@ -99,17 +106,18 @@ class DimCliente(Base):
 
 
 class DimFornecedor(Base):
-    """Fornecedores extraídos do SIA (GER_EMITENTES)."""
+    """Fornecedores extraídos do SIA (GER_EMITENTES).
+    GER_EMITENTES não tem CODEMP — é um cadastro global (sem isolamento por empresa).
+    """
     __tablename__ = "dim_fornecedor"
     __table_args__ = {"schema": "dw"}
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    codemp: Mapped[int] = mapped_column(Integer, nullable=False)
-    cod_sia: Mapped[int] = mapped_column(Integer, nullable=False)
-    nome: Mapped[str] = mapped_column(String(200), nullable=False)
-    cnpj_cpf: Mapped[str | None] = mapped_column(String(18))
-    ativo: Mapped[bool] = mapped_column(Boolean, default=True)
-    # TODO: adicionar campos após análise do GER_EMITENTES
+    cod_sia: Mapped[int] = mapped_column(Integer, nullable=False, unique=True, comment="EMI_COD")
+    nome: Mapped[str] = mapped_column(String(200), nullable=False, comment="EMI_DESC")
+    nome_fantasia: Mapped[str | None] = mapped_column(String(200), comment="EMI_FANT")
+    cnpj_cpf: Mapped[str | None] = mapped_column(String(18), comment="EMI_CNPJCPF")
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True, comment="EMI_ATIINA")
 
 
 class DimVersaoOrcamento(Base):
