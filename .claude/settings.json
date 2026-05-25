@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git remote *)",
+      "Bash(git config *)",
+      "Bash(git init *)",
+      "Bash(git checkout *)",
+      "Bash(git merge *)",
+      "Bash(git pull *)",
+      "Bash(git fetch *)",
+      "Bash(git stash *)",
+      "Bash(git reset *)",
+      "Bash(git rebase *)",
+      "Bash(docker compose *)",
+      "Bash(docker-compose *)",
+      "Bash(alembic *)",
+      "Bash(uvicorn *)",
+      "Bash(pytest *)",
+      "Bash(npm run dev)",
+      "Bash(npm run build)",
+      "Bash(npm install *)",
+      "Bash(pip install *)",
+      "Bash(pip install -r *)"
+    ],
+    "deny": []
+  }
+}

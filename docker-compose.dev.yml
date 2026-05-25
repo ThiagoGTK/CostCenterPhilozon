@@ -1,0 +1,28 @@
+version: "3.9"
+
+# Ambiente de desenvolvimento: apenas PostgreSQL rodando local.
+# API e ETL rodam diretamente na máquina (fora do Docker).
+# Use: docker compose -f docker-compose.dev.yml up -d
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: fpa_db_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: financeiro_dw
+      POSTGRES_USER: fpa_user
+      POSTGRES_PASSWORD: ${DW_PASSWORD:-dev_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - fpa_db_dev_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fpa_user -d financeiro_dw"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  fpa_db_dev_data:

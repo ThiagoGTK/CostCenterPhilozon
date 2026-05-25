@@ -1,0 +1,50 @@
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card.success { border-left: 3px solid var(--color-success); }
+.card.danger  { border-left: 3px solid var(--color-danger); }
+.card.neutral { border-left: 3px solid var(--color-primary); }
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.iconWrap {
+  color: var(--color-text-muted);
+}
+
+.value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+}
+
+.variacao {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.variacao.positivo { color: var(--color-success); }
+.variacao.negativo { color: var(--color-danger); }

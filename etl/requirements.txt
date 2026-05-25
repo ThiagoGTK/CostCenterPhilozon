@@ -1,0 +1,9 @@
+sqlalchemy==2.0.30
+psycopg2-binary==2.9.9
+pandas==2.2.2
+pyodbc==5.1.0
+python-dotenv==1.0.1
+python-dateutil==2.9.0
+
+# Testes
+pytest==8.2.0

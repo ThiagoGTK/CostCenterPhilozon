@@ -1,0 +1,41 @@
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.rascunho  { background: #f1f5f9; color: #475569; }
+.enviado   { background: #fef3c7; color: #92400e; }
+.aprovado  { background: #dcfce7; color: #166534; }
+.reprovado { background: #fee2e2; color: #991b1b; }
+
+.acoes {
+  display: flex;
+  gap: 8px;
+}
+
+.btnAprovar, .btnReprovar, .btnEnviar {
+  padding: 5px 12px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+}
+
+.btnAprovar {
+  background: var(--color-success);
+  color: white;
+}
+
+.btnReprovar {
+  background: var(--color-danger);
+  color: white;
+}
+
+.btnEnviar {
+  background: var(--color-primary);
+  color: white;
+}
