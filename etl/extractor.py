@@ -4,8 +4,10 @@ Camada de extração do ETL.
 IMPORTANTE:
 - Conecta ao SIA em modo SOMENTE LEITURA.
 - Nunca executar INSERT, UPDATE ou DELETE no SIA.
-- Todas as queries devem filtrar por CODEMP para isolamento de empresa.
-- Campos monetários INT64 precisam ser normalizados na camada transformer.
+- Queries transacionais (CTB_MOVIMENTOS, CRC, CPG) filtram por CODEMP.
+- CTB_CONTAS e CTB_CCUSTOS NÃO têm CODEMP — filtrar por plano (CON_CODPLA / CC_CODCCPL).
+- GER_EMITENTES NÃO tem CODEMP — cadastro global.
+- Campos monetários são NUMERIC nativos no Firebird (sem divisão por escala).
 """
 
 import logging
@@ -70,19 +72,21 @@ class SIAExtractor:
     # ── Extrações específicas ──────────────────────────────────────────────
 
     def extrair_empresas(self) -> pd.DataFrame:
-        """GER_EMPRESAS — empresas cadastradas no SIA."""
+        """GER_EMPRESAS — todas as empresas ativas (sem filtro por CODEMP)."""
         from etl.queries.ger import SQL_EMPRESAS
-        return self._query(SQL_EMPRESAS, {"codemp": self._cfg.sia_codemp})
+        return self._query(SQL_EMPRESAS)
 
     def extrair_plano_de_contas(self) -> pd.DataFrame:
-        """CTB_CONTAS — plano de contas contábil."""
+        """CTB_CONTAS — plano de contas Philozon (planos 1 e 2).
+        Nota: CTB_CONTAS não tem coluna CODEMP — filtrado por CON_CODPLA."""
         from etl.queries.ctb import SQL_PLANO_CONTAS
-        return self._query(SQL_PLANO_CONTAS, {"codemp": self._cfg.sia_codemp})
+        return self._query(SQL_PLANO_CONTAS)
 
     def extrair_centros_custo_sia(self) -> pd.DataFrame:
-        """CTB_CCUSTOS — centros de custo do SIA."""
+        """CTB_CCUSTOS — CCs do plano 3 (Philozon & Ozoncare).
+        Nota: CTB_CCUSTOS não tem coluna CODEMP — filtrado por CC_CODCCPL."""
         from etl.queries.ctb import SQL_CENTROS_CUSTO
-        return self._query(SQL_CENTROS_CUSTO, {"codemp": self._cfg.sia_codemp})
+        return self._query(SQL_CENTROS_CUSTO)
 
     def extrair_lancamentos_contabeis(self, ano: int, mes: int) -> pd.DataFrame:
         """CTB_MOVIMENTOS — lançamentos contábeis de um período."""

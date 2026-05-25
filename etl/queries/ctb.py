@@ -1,49 +1,68 @@
 """
 Queries de extração do módulo CTB (Contabilidade) do SIA.
 
-ATENÇÃO: Nomes de colunas marcados com TODO precisam ser validados
-contra o dicionário de dados real do SIA antes de usar em produção.
+Colunas validadas via MCP Firebird em 2026-05.
+
+Notas de estrutura:
+- CTB_CONTAS não tem CODEMP — filtrar por CON_CODPLA (plano da empresa).
+  Planos Philozon: 1 = "Philozon 2019", 2 = "Philozon 2023".
+- CTB_CCUSTOS não tem CODEMP — filtrar por CC_CODCCPL.
+  Plano 3 = "Philozon & Ozoncare".
+- MOV_VALOR é NUMERIC nativo — não dividir por 100.
+- MOV_TIPO: 1=Débito, 2=Crédito, 3=Encerramento exercício, 4=Transferência entre contas.
+- MOV_CECT pode ser NULL (lançamentos sem CC).
 """
 
-# TODO: Confirmar nomes reais das colunas na CTB_CONTAS
+# Plano de contas contábil da Philozon (planos 1 e 2)
 SQL_PLANO_CONTAS = """
     SELECT
-        C.CON_CODEMP,       -- TODO: confirmar nome
-        C.CON_CODIGO,       -- TODO: código da conta
-        C.CON_DESCRICAO,    -- TODO: nome da conta
-        C.CON_TIPO,         -- TODO: tipo da conta (S/A/R)
-        C.CON_NIVEL         -- TODO: nível hierárquico
+        C.CON_CODPLA,
+        C.CON_COD,
+        C.CON_CODSUP,
+        C.CON_CLASS,
+        C.CON_NIVEL,
+        C.CON_TIPO,
+        C.CON_DESC,
+        C.CON_INAT
     FROM CTB_CONTAS C
-    WHERE C.CON_CODEMP = ?
-    ORDER BY C.CON_CODIGO
+    WHERE C.CON_CODPLA IN (1, 2)
+      AND C.CON_INAT <> 'S'
+    ORDER BY C.CON_CODPLA, C.CON_CLASS
 """
 
-# TODO: Confirmar nomes reais das colunas na CTB_CCUSTOS
+# Centros de custo (plano 3 = Philozon & Ozoncare)
 SQL_CENTROS_CUSTO = """
     SELECT
-        CC.CCS_CODEMP,      -- TODO: confirmar nome
-        CC.CCS_CODIGO,      -- TODO: código do CC
-        CC.CCS_DESCRICAO    -- TODO: descrição do CC
+        CC.CC_CODCCPL,
+        CC.CC_COD,
+        CC.CC_CODSUP,
+        CC.CC_CLASS,
+        CC.CC_NIVEL,
+        CC.CC_TIPO,
+        CC.CC_DESC,
+        CC.CC_INAT
     FROM CTB_CCUSTOS CC
-    WHERE CC.CCS_CODEMP = ?
-    ORDER BY CC.CCS_CODIGO
+    WHERE CC.CC_CODCCPL = 3
+      AND CC.CC_INAT <> 'S'
+    ORDER BY CC.CC_CLASS
 """
 
-# TODO: Confirmar nomes reais das colunas na CTB_MOVIMENTOS
-# Campos monetários: MOV_VALOR é INT64, dividir por 100 (confirmar escala)
+# Lançamentos contábeis — apenas Débito (1) e Crédito (2)
+# Excluir tipo 3 (encerramento) e 4 (transferência entre contas)
 SQL_LANCAMENTOS = """
     SELECT
-        M.MOV_CODEMP,       -- TODO: confirmar nome
-        M.MOV_NUMERO,       -- TODO: número único do lançamento
-        M.MOV_DATA,         -- TODO: data de competência
-        M.MOV_CONTA,        -- TODO: código da conta contábil
-        M.MOV_CCUSTO,       -- TODO: código do centro de custo
-        M.MOV_VALOR,        -- INT64 — dividir por 100 para obter Decimal
-        M.MOV_TIPO,         -- D=Débito, C=Crédito
-        M.MOV_HISTORICO     -- TODO: histórico do lançamento
+        M.MOV_CODEMP,
+        M.MOV_NUMLAN,
+        M.MOV_DATA,
+        M.MOV_CODCON,
+        M.MOV_CECT,
+        M.MOV_TIPO,
+        M.MOV_VALOR,
+        M.MOV_HIST
     FROM CTB_MOVIMENTOS M
     WHERE M.MOV_CODEMP = ?
+      AND M.MOV_TIPO IN (1, 2)
       AND EXTRACT(YEAR  FROM M.MOV_DATA) = ?
       AND EXTRACT(MONTH FROM M.MOV_DATA) = ?
-    ORDER BY M.MOV_DATA, M.MOV_NUMERO
+    ORDER BY M.MOV_DATA, M.MOV_NUMLAN, M.MOV_CODCON
 """

@@ -53,21 +53,30 @@ password = "minha_senha_123"
 Todo upsert usa `ON CONFLICT DO UPDATE`. Rodar o pipeline duas vezes
 com os mesmos dados não cria duplicatas.
 
-### 5. Campos INT64 do SIA precisam de normalização
+### 5. Campos monetários do SIA já são NUMERIC — não dividir
 ```python
-# Exemplo: CTB_MOVIMENTOS.MOV_VALOR é INT64, escala 100
-valor = Decimal(str(valor_int64)) / Decimal("100")
+# CORRETO — MOV_VALOR é Firebird NUMERIC nativo
+valor = Decimal(str(row["MOV_VALOR"]))
+
+# ERRADO — divisão por 100 não se aplica a esta instância
+valor = Decimal(str(row["MOV_VALOR"])) / Decimal("100")
 ```
 
-O mapa de escalas fica em `etl/transformer.py → ESCALA_MONETARIA`.
+Validado em 2026-05 via MCP Firebird. MOV_VALOR, TIT_VAL, TITPAR_VAL
+são todos tipo 16 (NUMERIC) no Firebird — já vêm como decimal.
+Apenas converter para Decimal Python via `sia_decimal()` em `transformer.py`.
 
-### 6. Joins no SIA sempre com CODEMP
+### 6. Joins no SIA — atenção às tabelas sem CODEMP
 ```sql
--- CORRETO
-JOIN EST_PRODUTO P ON P.PRO_COD = M.MOV_PROCOD AND P.PRO_CODEMP = M.MOV_CODEMP
+-- Tabelas transacionais: sempre incluir CODEMP no join
+JOIN CRC_TITULOPARC TP ON TP.TITPAR_CODEMP = T.TIT_CODEMP AND TP.TITPAR_LANTIT = T.TIT_LAN
 
--- ERRADO — pode retornar dados de outras empresas
-JOIN EST_PRODUTO P ON P.PRO_COD = M.MOV_PROCOD
+-- CTB_CONTAS e CTB_CCUSTOS NÃO têm CODEMP
+-- Filtrar por plano da empresa em vez disso:
+WHERE CTB_CONTAS.CON_CODPLA IN (1, 2)   -- planos Philozon
+WHERE CTB_CCUSTOS.CC_CODCCPL = 3         -- plano "Philozon & Ozoncare"
+
+-- GER_EMITENTES NÃO tem CODEMP — cadastro global de fornecedores
 ```
 
 ---
@@ -123,9 +132,69 @@ python pipeline.py --ano 2025 --mes 1
 ```
 
 **TODO crítico antes de usar em produção:**
-1. Confirmar nomes reais das colunas de cada tabela do SIA
-2. Confirmar escala dos campos monetários por tabela
-3. Instalar driver Firebird ODBC no servidor/container
+1. ~~Confirmar nomes reais das colunas~~ — **concluído em 2026-05 (Fase 2)**
+2. ~~Confirmar escala dos campos monetários~~ — **NUMERIC nativo, sem divisão**
+3. Instalar driver Firebird ODBC no servidor/container ETL
+
+---
+
+## Mapeamento de Colunas Reais do SIA (validado 2026-05)
+
+### CTB_MOVIMENTOS
+| Campo SIA | Tipo | Descrição |
+|-----------|------|-----------|
+| MOV_CODEMP | INT | Empresa |
+| MOV_NUMLAN | INT | Nº do lançamento (sequencial por empresa/data) |
+| MOV_DATA | DATE | Data de competência |
+| MOV_CODCON | INT | FK → CTB_CONTAS.CON_COD |
+| MOV_CECT | INT/NULL | FK → CTB_CCUSTOS.CC_COD (pode ser NULL) |
+| MOV_TIPO | INT | 1=Débito, 2=Crédito, 3=Encerramento, 4=Transf. |
+| MOV_VALOR | NUMERIC | Valor já decimal (sem divisão por escala) |
+| MOV_HIST | VARCHAR | Histórico do lançamento |
+
+### CTB_CONTAS (sem CODEMP — filtrar por CON_CODPLA)
+Planos Philozon: `CON_CODPLA IN (1, 2)` (Philozon 2019, Philozon 2023)
+
+| Campo SIA | Tipo | Descrição |
+|-----------|------|-----------|
+| CON_CODPLA | INT | Plano de contas |
+| CON_COD | INT | Código da conta (PK parcial) |
+| CON_CODSUP | INT | Conta pai |
+| CON_CLASS | VARCHAR | Código hierárquico (ex: "1.01.02.03") |
+| CON_NIVEL | INT | Nível hierárquico |
+| CON_TIPO | CHAR(1) | Tipo da conta |
+| CON_DESC | VARCHAR | Descrição |
+| CON_INAT | CHAR(1) | 'S' = inativa |
+
+### CTB_CCUSTOS (sem CODEMP — filtrar por CC_CODCCPL)
+Plano Philozon: `CC_CODCCPL = 3` ("Philozon & Ozoncare")
+
+| Campo SIA | Tipo | Descrição |
+|-----------|------|-----------|
+| CC_CODCCPL | INT | Plano de centros de custo |
+| CC_COD | INT | Código do CC (PK parcial) |
+| CC_CODSUP | INT | CC pai |
+| CC_CLASS | VARCHAR | Código hierárquico |
+| CC_NIVEL | INT | Nível hierárquico |
+| CC_TIPO | CHAR(1) | Tipo |
+| CC_DESC | VARCHAR | Descrição |
+| CC_INAT | CHAR(1) | 'S' = inativo |
+
+### CRC_TITULO + CRC_TITULOPARC
+- CRC_TITULO: `TIT_CODEMP + TIT_LAN` = chave. Cliente = `TIT_CODCLI`. Valor = `TIT_VAL`.
+- CRC_TITULOPARC: join por `TITPAR_CODEMP + TITPAR_LANTIT`. Parcela = `TITPAR_NUM`. Venc. = `TITPAR_DTVENC`. Saldo = `TITPAR_SAL`. Situação = `TITPAR_SIT`.
+
+### CPG_TITULO + CPG_TITULOPARC
+- CPG_TITULO: `TIT_CODEMP + TIT_LAN` = chave. Credor = `TIT_CODCRE` (FK GER_EMITENTES.EMI_COD).
+- CPG_TITULOPARC: mesma estrutura da CRC.
+
+### GER_EMPRESAS
+- Chave: `EMP_COD`. Ativas: `EMP_ATIINA = 'A'`.
+- Empresas Philozon: EMP_COD 1, 3, 4. O3R: EMP_COD 2. EMP_COD 100 = inativa.
+
+### GER_CLIDEST / GER_EMITENTES
+- Clientes: `CLI_CODEMP + CLI_COD`. Nome = `CLI_DESC`. CNPJ = `CLI_CNPJCPF`.
+- Fornecedores (GER_EMITENTES): **sem CODEMP** — global. Chave = `EMI_COD`. Nome = `EMI_DESC`.
 
 ---
 
