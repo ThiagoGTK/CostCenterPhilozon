@@ -90,6 +90,9 @@ export interface WorkflowItem {
   id: number;
   id_versao: number;
   id_empresa: number;
+  versao_nome: string;
+  versao_ano: number;
+  empresa_nome: string;
   status: "RASCUNHO" | "ENVIADO" | "APROVADO" | "REPROVADO";
   criado_por: string;
   enviado_por?: string;
@@ -98,6 +101,8 @@ export interface WorkflowItem {
   data_envio?: string;
   data_decisao?: string;
   comentario?: string;
+  criado_em: string;
+  atualizado_em: string;
 }
 
 export interface MapeamentoConta {
@@ -194,3 +199,28 @@ export const atualizarMapeamentoCC = (id: number, payload: { id_centro_custo_ger
 
 export const desativarMapeamentoCC = (id: number) =>
   api.delete(`/mapeamentos/centros-custo/${id}`);
+
+// Workflow
+export const getWorkflows = (ano?: number) =>
+  api
+    .get<WorkflowItem[]>("/workflow/", { params: ano != null ? { ano } : {} })
+    .then((r) => r.data);
+
+export const iniciarWorkflow = (payload: {
+  id_versao: number;
+  id_empresa: number;
+  criado_por: string;
+}) => api.post<WorkflowItem>("/workflow/iniciar", payload).then((r) => r.data);
+
+export const enviarWorkflow = (id: number, payload: { enviado_por: string }) =>
+  api.post<WorkflowItem>(`/workflow/${id}/enviar`, payload).then((r) => r.data);
+
+export const aprovarWorkflow = (
+  id: number,
+  payload: { aprovado_por: string; comentario?: string }
+) => api.post<WorkflowItem>(`/workflow/${id}/aprovar`, payload).then((r) => r.data);
+
+export const reprovarWorkflow = (
+  id: number,
+  payload: { reprovado_por: string; comentario: string }
+) => api.post<WorkflowItem>(`/workflow/${id}/reprovar`, payload).then((r) => r.data);

@@ -17,6 +17,18 @@ class Settings(BaseSettings):
     # Threshold de variação que exige justificativa (%)
     variacao_threshold_pct: float = 10.0
 
+    # Email / SMTP
+    email_enabled: bool = False
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    email_from: str = "fpa@philozon.com.br"
+    # Lista de aprovadores: e-mails separados por vírgula
+    email_aprovadores: str = ""
+    # E-mail que recebe notificação de aprovação/reprovação
+    email_notificacao_workflow: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

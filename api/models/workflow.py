@@ -3,13 +3,21 @@ Tabelas de controle de workflow do orçamento.
 Schema: dw
 """
 
+from __future__ import annotations
+
 from decimal import Decimal
 from datetime import datetime
-from sqlalchemy import Integer, NUMERIC, DateTime, String, Text, ForeignKey, Enum
+from typing import TYPE_CHECKING
+
+from sqlalchemy import Integer, NUMERIC, DateTime, String, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 import enum
+
 from api.db.session import Base
+
+if TYPE_CHECKING:
+    from api.models.dimensoes import DimVersaoOrcamento, DimEmpresa
 
 
 class StatusWorkflow(str, enum.Enum):
@@ -48,6 +56,9 @@ class WorkflowOrcamento(Base):
 
     criado_em: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     atualizado_em: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    versao: Mapped[DimVersaoOrcamento] = relationship("DimVersaoOrcamento", lazy="joined")
+    empresa: Mapped[DimEmpresa] = relationship("DimEmpresa", lazy="joined")
 
 
 class JustificativaVariacao(Base):

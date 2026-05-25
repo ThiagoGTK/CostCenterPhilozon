@@ -4,6 +4,7 @@
   border-radius: 20px;
   font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .rascunho  { background: #f1f5f9; color: #475569; }
@@ -14,15 +15,17 @@
 .acoes {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
-.btnAprovar, .btnReprovar, .btnEnviar {
+.btnAprovar, .btnReprovar, .btnEnviar, .btnIniciar {
   padding: 5px 12px;
   border-radius: 5px;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   border: none;
+  white-space: nowrap;
 }
 
 .btnAprovar {
@@ -38,4 +41,106 @@
 .btnEnviar {
   background: var(--color-primary);
   color: white;
+}
+
+.btnIniciar {
+  background: #f8fafc;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+/* ── Modal ────────────────────────────────────────────────────────────────── */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  padding: 24px;
+  width: 440px;
+  max-width: 95vw;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modalTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.modalMeta {
+  font-size: 13px;
+  color: #64748b;
+  background: #f8fafc;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+}
+
+.modalField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.modalField input,
+.modalField select,
+.modalField textarea {
+  padding: 7px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  font-size: 13px;
+  color: var(--color-text);
+  font-family: inherit;
+  resize: vertical;
+}
+
+.modalField textarea {
+  min-height: 80px;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.errorInline {
+  font-size: 12px;
+  color: #dc2626;
+  margin: 0;
+}
+
+/* ── Detalhes de decisão ──────────────────────────────────────────────────── */
+
+.decisaoInfo {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.comentarioTexto {
+  font-size: 12px;
+  color: #475569;
+  font-style: italic;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
