@@ -7,7 +7,6 @@ import {
   ArrowLeftRight,
   FolderTree,
   Settings,
-  TrendingUp,
 } from "lucide-react";
 import styles from "./Sidebar.module.css";
 
@@ -28,8 +27,12 @@ export default function Sidebar() {
   return (
     <aside className={styles.sidebar}>
       <div className={styles.brand}>
-        <TrendingUp size={22} />
-        <span>FP&amp;A Financeiro</span>
+        <div className={styles.brandLogo}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M2 12 L5 7 L8 9 L11 4 L14 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <span>FP&amp;A Philozon</span>
       </div>
 
       <nav className={styles.nav}>
@@ -51,7 +54,7 @@ export default function Sidebar() {
                   `${styles.navItem} ${isActive ? styles.active : ""}`
                 }
               >
-                <Icon size={16} />
+                <Icon size={15} />
                 <span>{item.label}</span>
               </NavLink>
             );
@@ -61,7 +64,7 @@ export default function Sidebar() {
       </nav>
 
       <div className={styles.footer}>
-        <span>v0.1.0 — MVP</span>
+        v0.1.0 — MVP
       </div>
     </aside>
   );

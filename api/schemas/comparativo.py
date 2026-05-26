@@ -6,8 +6,10 @@ class ComparativoItem(BaseModel):
     mes: int
     conta_gerencial_codigo: str
     conta_gerencial_nome: str
-    centro_custo_codigo: str
-    centro_custo_nome: str
+    # CC is NULL when all lançamentos have no cost center (MOV_CECT = NULL)
+    # In that case the comparativo aggregates orcado across all CCs per conta-mes
+    centro_custo_codigo: str | None = None
+    centro_custo_nome: str | None = None
     valor_orcado: Decimal
     valor_realizado: Decimal
 

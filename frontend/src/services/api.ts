@@ -21,6 +21,13 @@ export interface VersaoOrcamento {
   bloqueada: boolean;
 }
 
+export interface Empresa {
+  id: number;
+  codemp: number;
+  nome: string;
+  ativa: boolean;
+}
+
 export interface CentroCusto {
   id: number;
   codigo: string;
@@ -56,8 +63,9 @@ export interface ComparativoItem {
   mes: number;
   conta_gerencial_codigo: string;
   conta_gerencial_nome: string;
-  centro_custo_codigo: string;
-  centro_custo_nome: string;
+  // null when lançamentos have no CC (MOV_CECT = NULL) — orcado é agregado por conta-mes
+  centro_custo_codigo: string | null;
+  centro_custo_nome: string | null;
   valor_orcado: number;
   valor_realizado: number;
   variacao_percentual: number;
@@ -126,6 +134,10 @@ export interface MapeamentoCC {
 }
 
 // ── API calls ──────────────────────────────────────────────────────────────
+
+// Empresas
+export const getEmpresas = (apenasAtivas = true) =>
+  api.get<Empresa[]>("/empresas/", { params: { apenas_ativas: apenasAtivas } }).then((r) => r.data);
 
 // Dimensões
 export const getCentrosCusto = (apenasAtivos = true) =>

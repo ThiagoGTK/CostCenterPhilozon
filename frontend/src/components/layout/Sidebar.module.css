@@ -1,7 +1,7 @@
 .sidebar {
-  width: 240px;
+  width: 230px;
   background: var(--color-sidebar);
-  color: #c8d0e0;
+  color: #c8d8f0;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -12,56 +12,72 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 20px 18px;
-  font-size: 15px;
+  padding: 18px 16px;
+  font-size: 14px;
   font-weight: 700;
   color: #ffffff;
-  border-bottom: 1px solid rgba(255,255,255,0.07);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  letter-spacing: 0.01em;
+}
+
+.brandLogo {
+  width: 28px;
+  height: 28px;
+  background: var(--color-accent);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .nav {
   flex: 1;
-  padding: 12px 0;
+  padding: 10px 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .section {
-  padding: 16px 18px 6px;
+  padding: 14px 16px 5px;
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #5a6785;
+  letter-spacing: 0.09em;
+  color: rgba(255,255,255,0.35);
 }
 
 .navItem {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 18px;
-  font-size: 13.5px;
-  color: #9ba8bf;
-  border-radius: 0;
-  transition: background 0.15s, color 0.15s;
-  margin: 0 8px;
+  gap: 9px;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.65);
   border-radius: 6px;
+  margin: 0 8px;
+  transition: background 0.15s, color 0.15s;
 }
 
 .navItem:hover {
-  background: var(--color-sidebar-hover);
+  background: rgba(255,255,255,0.1);
   color: #ffffff;
 }
 
 .navItem.active {
   background: var(--color-primary);
   color: #ffffff;
+  font-weight: 500;
+}
+
+.navItem.active svg {
+  color: var(--color-accent);
 }
 
 .footer {
-  padding: 14px 18px;
-  font-size: 11px;
-  color: #3d4f6b;
-  border-top: 1px solid rgba(255,255,255,0.05);
+  padding: 12px 16px;
+  font-size: 10px;
+  color: rgba(255,255,255,0.25);
+  border-top: 1px solid rgba(255,255,255,0.06);
 }

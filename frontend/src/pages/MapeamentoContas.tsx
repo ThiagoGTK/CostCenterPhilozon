@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useContasSia, useContasGerenciais } from "../hooks/useDimensoes";
+import { useContasSia, useContasGerenciais, useEmpresaAtiva } from "../hooks/useDimensoes";
 import {
   useMapeamentosContas,
   useCriarMapeamentoConta,
@@ -7,14 +7,12 @@ import {
 } from "../hooks/useMapeamentos";
 import styles from "./PageGeneric.module.css";
 
-// Empresa padrão: Philozon EMP_COD 1
-const ID_EMPRESA_PADRAO = 1;
-
 export default function MapeamentoContas() {
   const [form, setForm] = useState({ id_conta_sia: "", id_conta_gerencial: "" });
   const [erro, setErro] = useState("");
 
-  const { data: mapeamentos = [], isLoading } = useMapeamentosContas(ID_EMPRESA_PADRAO);
+  const { idEmpresa } = useEmpresaAtiva();
+  const { data: mapeamentos = [], isLoading } = useMapeamentosContas(idEmpresa ?? undefined);
   const { data: contasSia = [] } = useContasSia({ codpla: 2 }); // plano mais recente
   const { data: contasGer = [] } = useContasGerenciais({ apenas_ativas: true });
 
@@ -36,7 +34,7 @@ export default function MapeamentoContas() {
       await criar.mutateAsync({
         id_conta_sia: Number(form.id_conta_sia),
         id_conta_gerencial: Number(form.id_conta_gerencial),
-        id_empresa: ID_EMPRESA_PADRAO,
+        id_empresa: idEmpresa!,
       });
       setForm({ id_conta_sia: "", id_conta_gerencial: "" });
     } catch {

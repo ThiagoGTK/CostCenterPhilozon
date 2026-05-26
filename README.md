@@ -1,77 +1,101 @@
 # FP&A Financeiro — Plataforma de Planejamento Orçamentário
 
-Plataforma interna de FP&A (Financial Planning & Analysis) com:
-- Orçamento anual com versionamento (Original, Revisão, Forecast)
-- Acompanhamento Realizado × Orçado
-- Workflow de aprovação
-- BI financeiro via Metabase
-- ETL do ERP System SIA (read-only)
+Plataforma interna para orçamento empresarial e acompanhamento **Realizado × Orçado**, integrada ao ERP System SIA via ETL.
+
+---
+
+## Stack
+
+| Camada | Tecnologia |
+|--------|-----------|
+| Backend | Python 3.11 · FastAPI · SQLAlchemy 2 · Alembic |
+| Banco analítico | PostgreSQL 15 (schemas `dw` e `app`) |
+| ETL | Python · pandas · pyodbc (Firebird ODBC) |
+| Frontend | React 18 · TypeScript · Vite · Recharts · TanStack Query v5 |
+| BI | Metabase v0.50 (conectado ao schema `dw`) |
+| Deploy | Docker Compose · Nginx |
+
+---
+
+## Funcionalidades
+
+- **Orçamento** — lançamento por conta gerencial, centro de custo e mês; versionamento (Original, Revisão, Forecast)
+- **Comparativo Realizado × Orçado** — por versão, empresa e período
+- **DRE Gerencial** — hierarquia de contas com realizado e orçado
+- **Workflow de Aprovação** — RASCUNHO → ENVIADO → APROVADO | REPROVADO; notificações SMTP
+- **Mapeamentos** — contas SIA → gerenciais; CCs SIA → gerenciais
+- **Metabase** — 5 views analíticas prontas para dashboard
 
 ---
 
 ## Pré-requisitos
 
-- Docker e Docker Compose (v2.x)
-- Python 3.11+
-- Node.js 20+
-- Driver ODBC Firebird (para o ETL conectar ao SIA)
+- Docker + Docker Compose v2
+- Python 3.11+ (desenvolvimento local)
+- Node.js 20+ (desenvolvimento local)
+- Driver ODBC Firebird instalado no servidor do ETL
 
 ---
 
-## Setup — Desenvolvimento
+## Setup — Desenvolvimento local
 
 ### 1. Variáveis de ambiente
 
 ```bash
 cp .env.example .env
-# Edite .env com as credenciais reais (nunca commitar o .env!)
+# Preencha .env com as credenciais reais — nunca commitar!
 ```
 
-### 2. Subir o banco de dados (dev)
+Variáveis obrigatórias:
+
+```
+DW_HOST / DW_PORT / DW_NAME / DW_USER / DW_PASSWORD
+DATABASE_URL
+SIA_HOST / SIA_PORT / SIA_DATABASE / SIA_USER / SIA_PASSWORD / SIA_CODEMP
+VITE_API_URL=http://localhost:8000/api/v1
+VITE_EMPRESA_CODEMP=1          # EMP_COD da empresa principal no SIA
+```
+
+### 2. Banco de dados (dev)
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-O PostgreSQL ficará disponível em `localhost:5432`.
-
-### 3. Backend (API FastAPI)
+### 3. Backend
 
 ```bash
 cd api
 python -m venv .venv
-.venv\Scripts\activate        # Windows
-# source .venv/bin/activate   # Linux/macOS
-
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate     # Linux/macOS
 pip install -r requirements.txt
 
-# Rodar migrations
 cd ..
-alembic upgrade head
+alembic upgrade head             # aplica todas as migrations
 
-# Iniciar API
 cd api
 uvicorn api.main:app --reload --port 8000
+# Docs interativa: http://localhost:8000/docs
 ```
 
-Acesse: http://localhost:8000/docs
-
-### 4. Frontend (React)
+### 4. Frontend
 
 ```bash
 cd frontend
+cp .env.example .env             # ou crie com VITE_API_URL e VITE_EMPRESA_CODEMP
 npm install
 npm run dev
+# http://localhost:5173
 ```
 
-Acesse: http://localhost:3000
-
-### 5. ETL (teste local)
+### 5. ETL (manual)
 
 ```bash
 cd etl
 pip install -r requirements.txt
 python pipeline.py --ano 2025 --mes 1
+# Opções: --ano, --mes, --codemp (forçar empresa)
 ```
 
 ---
@@ -79,19 +103,38 @@ python pipeline.py --ano 2025 --mes 1
 ## Deploy — Produção
 
 ```bash
-cp .env.example .env
-# Configure .env com credenciais de produção
+# 1. Build do frontend
+cd frontend && npm run build && cd ..
 
+# 2. Subir todos os serviços
 docker compose up -d --build
 ```
 
-Serviços:
-| Serviço   | URL                          |
-|-----------|------------------------------|
-| Frontend  | http://servidor/             |
-| API       | http://servidor/api/v1/      |
-| API Docs  | http://servidor/docs         |
-| Metabase  | http://servidor/metabase/    |
+| Serviço  | URL |
+|----------|-----|
+| Frontend | `http://servidor/` |
+| API REST | `http://servidor/api/v1/` |
+| Swagger  | `http://servidor/docs` |
+| Metabase | `http://servidor/metabase/` |
+
+---
+
+## Migrations
+
+```bash
+alembic upgrade head                        # aplicar todas
+alembic downgrade -1                        # reverter uma
+alembic revision --autogenerate -m "descr" # gerar nova
+```
+
+Sequência atual: `001 → 002 → 003 → 004`
+
+| Migration | Descrição |
+|-----------|-----------|
+| 001 | Schema inicial — todas as tabelas do DW |
+| 002 | Fix `dim_conta_sia` (`codemp→codpla`, adiciona `conta_class`); remove `codemp` de `dim_fornecedor` |
+| 003 | 5 views analíticas para Metabase |
+| 004 | Corrige `v_comparativo_mensal` — remove join por CC (todos os lançamentos SIA têm `MOV_CECT = NULL`) |
 
 ---
 
@@ -99,72 +142,110 @@ Serviços:
 
 ```
 financeiro-fpa/
-├── api/                 # Backend FastAPI
-│   ├── main.py          # App entry point
-│   ├── config.py        # Configurações via .env
-│   ├── db/              # SQLAlchemy engine e session
-│   ├── models/          # Modelos ORM (dimensões, fatos, workflow)
-│   ├── schemas/         # Pydantic schemas (request/response)
-│   ├── routers/         # Endpoints REST
-│   ├── services/        # Regras de negócio
-│   └── tests/           # Testes pytest
-├── etl/                 # Pipeline ETL SIA → DW
-│   ├── config.py        # Configuração ETL
-│   ├── extractor.py     # Extração do SIA (read-only)
-│   ├── transformer.py   # Normalização e transformação
-│   ├── loader.py        # Carga idempotente no DW
-│   ├── pipeline.py      # Orquestrador
-│   └── queries/         # SQL de extração por módulo
-├── frontend/            # React + TypeScript
-│   └── src/
-│       ├── components/  # Layout, UI components
-│       ├── pages/       # Dashboard, Orçamento, Comparativo, etc.
-│       └── services/    # API client e formatadores
-├── migrations/          # Alembic migrations
-├── infra/               # Nginx, init.sql
-└── metabase/            # Config e dashboards exportados
+├── api/
+│   ├── config.py           # Settings via pydantic-settings (.env)
+│   ├── main.py             # FastAPI app + CORS + routers
+│   ├── db/                 # Engine, session, Base
+│   ├── models/             # ORM: dimensoes, fatos, workflow, mapeamento
+│   ├── schemas/            # Pydantic I/O schemas
+│   ├── routers/            # 9 routers REST
+│   └── services/
+│       └── email.py        # Notificações SMTP (stdlib smtplib)
+├── etl/
+│   ├── pipeline.py         # Orquestrador: 4 passos por execução
+│   ├── extractor.py        # SIA read-only via pyodbc
+│   ├── transformer.py      # Normalização, Decimal, chave de idempotência
+│   ├── loader.py           # Upserts idempotentes no DW
+│   ├── config.py           # ETLConfig (dataclass)
+│   └── queries/            # SQL separado por módulo (ctb, ger, crc, cpg, fis)
+├── frontend/src/
+│   ├── pages/              # 8 páginas React
+│   ├── hooks/              # React Query hooks (5 arquivos)
+│   ├── services/
+│   │   ├── api.ts          # Axios client + todos os tipos TS + funções HTTP
+│   │   └── format.ts       # formatCurrency, formatPercent
+│   └── components/         # Layout, KpiCard, etc.
+├── migrations/
+│   └── versions/           # 001–004
+├── infra/
+│   ├── nginx/nginx.conf
+│   ├── postgres/init.sql   # Cria roles (fpa_user, metabase_reader)
+│   └── metabase/           # SETUP.md + SQLs prontos para Metabase
+├── docs/                   # Documentação técnica detalhada
+│   ├── API.md
+│   ├── BANCO_DE_DADOS.md
+│   ├── ETL.md
+│   └── DECISOES_TECNICAS.md
+├── .env.example
+├── docker-compose.yml      # Produção (db, api, etl, metabase, nginx)
+├── docker-compose.dev.yml  # Dev (só db)
+├── alembic.ini
+└── CLAUDE.md               # Contexto para Claude Code
 ```
+
+---
+
+## Endpoints da API
+
+Documentação completa em [`docs/API.md`](docs/API.md). Resumo:
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| GET | `/health` | Health check |
+| GET | `/api/v1/empresas/` | Lista empresas |
+| GET | `/api/v1/centros-custo/` | Lista CCs gerenciais |
+| POST | `/api/v1/centros-custo/` | Cria CC |
+| GET | `/api/v1/contas-gerenciais/` | Lista plano gerencial |
+| POST | `/api/v1/contas-gerenciais/` | Cria conta |
+| GET | `/api/v1/versoes-orcamento/{ano}` | Lista versões |
+| POST | `/api/v1/versoes-orcamento/` | Cria versão |
+| GET | `/api/v1/orcamento/{ano}/{id_versao}` | Carrega orçamento |
+| POST | `/api/v1/orcamento/` | Salva célula (upsert) |
+| GET | `/api/v1/comparativo/{ano}/{id_versao}` | Realizado × Orçado |
+| GET | `/api/v1/dre/{ano}/{id_versao}` | DRE gerencial |
+| GET | `/api/v1/lancamentos/{YYYY-MM}` | Lançamentos realizados |
+| GET | `/api/v1/workflow/` | Lista workflows |
+| POST | `/api/v1/workflow/iniciar` | Cria RASCUNHO |
+| POST | `/api/v1/workflow/{id}/enviar` | RASCUNHO → ENVIADO |
+| POST | `/api/v1/workflow/{id}/aprovar` | ENVIADO → APROVADO |
+| POST | `/api/v1/workflow/{id}/reprovar` | ENVIADO → REPROVADO |
+| GET | `/api/v1/mapeamentos/contas` | Lista mapeamentos de contas |
+| POST | `/api/v1/mapeamentos/contas` | Cria mapeamento |
+| GET | `/api/v1/mapeamentos/centros-custo` | Lista mapeamentos de CC |
+| POST | `/api/v1/mapeamentos/centros-custo` | Cria mapeamento de CC |
+
+---
+
+## Regras absolutas
+
+1. **Nunca float** — `Decimal` no Python, `NUMERIC(15,2)` no PostgreSQL
+2. **SIA é read-only** — zero INSERT/UPDATE/DELETE no banco Firebird
+3. **Secrets no .env** — nunca commitar senhas ou tokens
+4. **ETL idempotente** — `ON CONFLICT DO UPDATE` em todos os upserts
+5. **Filtrar por empresa** — queries no SIA sempre usam `CODEMP` ou equivalente
+6. **Escala monetária SIA** — `MOV_VALOR` é `NUMERIC` nativo no Firebird, **não dividir por escala**
 
 ---
 
 ## Testes
 
 ```bash
-# Testes da API (regras monetárias, schemas)
-cd api
-pytest tests/ -v
+# Backend
+cd api && pytest tests/ -v
 
-# Testes do ETL (transformação, idempotência)
-cd etl
-pytest tests/ -v
+# ETL
+cd etl && pytest tests/ -v
 ```
 
 ---
 
-## Regras de Desenvolvimento
+## Documentação adicional
 
-1. **Float nunca** — sempre `Decimal` no Python, `NUMERIC(15,2)` no PostgreSQL.
-2. **SIA é read-only** — nunca INSERT/UPDATE/DELETE no banco SIA.
-3. **Secrets no .env** — nunca commitar credenciais.
-4. **ETL idempotente** — `ON CONFLICT DO UPDATE` em todos os upserts.
-5. **Filtrar por empresa** — toda query no SIA usa `CODEMP`.
-6. **Escala INT64** — campos monetários do SIA são divididos por 100 (confirmar por tabela).
-
----
-
-## Endpoints Principais
-
-| Método | Endpoint                              | Descrição                    |
-|--------|---------------------------------------|------------------------------|
-| GET    | `/health`                             | Health check                 |
-| GET    | `/api/v1/centros-custo`               | Lista CCs gerenciais         |
-| POST   | `/api/v1/centros-custo`               | Cria CC gerencial            |
-| GET    | `/api/v1/contas-gerenciais`           | Lista plano gerencial        |
-| GET    | `/api/v1/versoes-orcamento/{ano}`     | Versões do orçamento         |
-| GET    | `/api/v1/orcamento/{ano}/{id_versao}` | Lançamentos de orçamento     |
-| POST   | `/api/v1/orcamento`                   | Lança/atualiza orçamento     |
-| GET    | `/api/v1/comparativo/{ano}/{versao}`  | Realizado × Orçado           |
-| GET    | `/api/v1/dre/{ano}/{versao}`          | DRE gerencial                |
-| POST   | `/api/v1/workflow/enviar`             | Envia para aprovação         |
-| POST   | `/api/v1/workflow/aprovar`            | Aprova orçamento             |
-| POST   | `/api/v1/workflow/reprovar`           | Reprova orçamento            |
+| Documento | Conteúdo |
+|-----------|---------|
+| [`docs/API.md`](docs/API.md) | Todos os endpoints com parâmetros e exemplos |
+| [`docs/BANCO_DE_DADOS.md`](docs/BANCO_DE_DADOS.md) | Schema completo, tabelas, índices, views |
+| [`docs/ETL.md`](docs/ETL.md) | Pipeline ETL passo a passo, colunas SIA validadas |
+| [`docs/DECISOES_TECNICAS.md`](docs/DECISOES_TECNICAS.md) | ADRs, limitações do SIA, estratégias adotadas |
+| [`infra/metabase/SETUP.md`](infra/metabase/SETUP.md) | Configuração do Metabase e dashboards |
+| [`CLAUDE.md`](CLAUDE.md) | Contexto completo para o Claude Code |

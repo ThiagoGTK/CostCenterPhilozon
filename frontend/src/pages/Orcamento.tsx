@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { useVersoes, useCentrosCusto, useContasGerenciais } from "../hooks/useDimensoes";
+import { useVersoes, useCentrosCusto, useContasGerenciais, useEmpresaAtiva } from "../hooks/useDimensoes";
 import { useOrcamento, useSalvarOrcamentoItem } from "../hooks/useOrcamento";
 import { formatCurrency } from "../services/format";
 import styles from "./PageGeneric.module.css";
 
 const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-const ID_EMPRESA_PADRAO = 1;
 
 // key to identify a budget cell
 function cellKey(contaId: number, mes: number) {
@@ -23,6 +22,7 @@ export default function Orcamento() {
   const [salvando, setSalvando] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
+  const { idEmpresa } = useEmpresaAtiva();
   const { data: versoes = [] } = useVersoes(ano);
   const { data: centros = [] } = useCentrosCusto();
   const { data: contas = [] } = useContasGerenciais({ apenas_ativas: true });
@@ -40,7 +40,7 @@ export default function Orcamento() {
   const { data: orcamentoExistente = [], isLoading: loadingOrc } = useOrcamento(
     ano,
     idVersao,
-    { id_empresa: ID_EMPRESA_PADRAO, ...ccParam }
+    idEmpresa != null ? { id_empresa: idEmpresa, ...ccParam } : undefined
   );
 
   // Populate local state when existing data arrives
@@ -99,7 +99,7 @@ export default function Orcamento() {
           const valor = parseFloat(raw) || 0;
           saves.push(
             salvarItem.mutateAsync({
-              id_empresa: ID_EMPRESA_PADRAO,
+              id_empresa: idEmpresa!,
               id_versao: idVersao as number,
               id_conta_gerencial: conta.id,
               id_centro_custo: Number(idCC),

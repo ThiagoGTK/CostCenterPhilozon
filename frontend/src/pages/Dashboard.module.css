@@ -1,82 +1,273 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
-.kpiGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
-}
-
-.chartsRow {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-@media (max-width: 1024px) {
-  .chartsRow { grid-template-columns: 1fr; }
-}
-
-.chartCard {
-  background: var(--color-surface);
-  border-radius: var(--radius);
-  padding: 20px;
-  box-shadow: var(--shadow);
-  border: 1px solid var(--color-border);
-}
-
-.chartCardFull {
-  background: var(--color-surface);
-  border-radius: var(--radius);
-  padding: 20px;
-  box-shadow: var(--shadow);
-  border: 1px solid var(--color-border);
-}
-
-.chartTitle {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: 16px;
-}
-
-.filterRow {
+/* ── Barra de contexto ─────────────────────────── */
+.contextBar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.contextLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
 .select {
-  padding: 6px 10px;
+  padding: 6px 12px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  font-size: 14px;
+  font-size: 13px;
   background: var(--color-surface);
+  color: var(--color-text);
+  outline: none;
 }
 
-.versaoLabel {
-  font-size: 13px;
-  color: #64748b;
-  background: #f1f5f9;
-  padding: 4px 10px;
+.select:focus {
+  border-color: var(--color-primary);
+}
+
+.badgePlan {
+  font-size: 12px;
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+  padding: 3px 10px;
   border-radius: 20px;
+  font-weight: 500;
+}
+
+.badgeEmpresa {
+  font-size: 12px;
+  color: #fff;
+  background: var(--color-primary-dark);
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+.horizonte {
+  font-size: 12px;
+  color: var(--color-text-muted);
 }
 
 .loading {
-  font-size: 13px;
+  font-size: 12px;
   color: #94a3b8;
 }
 
-.emptyState {
+/* ── Card base ─────────────────────────────────── */
+.card {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  padding: 40px;
-  text-align: center;
-  color: #64748b;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--color-border);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.cardTitle {
   font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 2px;
+}
+
+.cardSub {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* ── Grid principal ────────────────────────────── */
+.mainGrid {
+  display: grid;
+  grid-template-columns: 1.7fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .mainGrid { grid-template-columns: 1fr; }
+}
+
+/* ── Tabela DRE ────────────────────────────────── */
+.dreTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.colEstrutura { text-align: left; }
+.colVal { text-align: right; width: 130px; }
+.colVar { text-align: right; width: 90px; }
+
+.dreTable thead th {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  padding: 0 8px 10px;
+  border-bottom: 2px solid var(--color-border);
+}
+
+.dreTable thead th:not(.colEstrutura) {
+  text-align: right;
+}
+
+.dreTable tbody td {
+  padding: 7px 8px;
+  border-bottom: 1px solid #f5f8fc;
+}
+
+.rowConta td {
+  color: var(--color-text);
+}
+
+.valCol {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.varCol {
+  text-align: right !important;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.pos { color: var(--color-success); }
+.neg { color: var(--color-danger); }
+
+.rowSubtotal td {
+  font-weight: 600;
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+  border-top: 1px solid #c8dff0;
+  border-bottom: 2px solid #c8dff0;
+}
+
+.rowSpacer td {
+  height: 10px;
+  border: none;
+  background: transparent;
+}
+
+.rowEbitda td {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--color-accent);
+  background: var(--color-accent-light);
+  border-top: 2px solid var(--color-accent);
+}
+
+/* ── Mapa de Indicadores ───────────────────────── */
+.mapaGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.mapaBloco {
+  border-radius: 8px;
+  padding: 14px 16px;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mapaBlocoFull {
+  grid-column: 1 / -1;
+}
+
+.mapaPct {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.mapaLabel {
+  font-size: 10px;
+  opacity: 0.82;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-top: 2px;
+}
+
+.mapaValor {
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 6px;
+  opacity: 0.9;
+}
+
+/* ── Gauge EBITDA ──────────────────────────────── */
+.gauge {
+  background: #f4f8fc;
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gaugeHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gaugeLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.gaugePct {
+  font-size: 11px;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.gaugeValor {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: -0.02em;
+}
+
+.gaugeBar {
+  height: 6px;
+  background: #dde8f5;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.gaugeFill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+
+/* ── Empty state ───────────────────────────────── */
+.emptyState {
+  padding: 32px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 13px;
 }

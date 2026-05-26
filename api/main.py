@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.config import get_settings
-from api.routers import centros_custo, contas_gerenciais, mapeamento, orcamento, comparativo, workflow, lancamentos, dre
+from api.routers import centros_custo, contas_gerenciais, empresas, mapeamento, orcamento, comparativo, workflow, lancamentos, dre
 
 settings = get_settings()
 
@@ -25,6 +25,7 @@ app.add_middleware(
 
 PREFIX = "/api/v1"
 
+app.include_router(empresas.router, prefix=PREFIX)
 app.include_router(centros_custo.router, prefix=PREFIX)
 app.include_router(contas_gerenciais.router, prefix=PREFIX)
 app.include_router(mapeamento.router, prefix=PREFIX)

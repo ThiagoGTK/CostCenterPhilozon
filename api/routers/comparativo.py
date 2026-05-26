@@ -21,30 +21,60 @@ def comparativo(
     id_centro_custo: int | None = None,
     db: Session = Depends(get_db),
 ):
-    # Query SQL direto para performance — resultado agregado por mes/conta/CC
+    # Lançamentos do SIA não têm centro de custo (MOV_CECT = NULL para todas as empresas),
+    # portanto id_centro_custo em fato_lancamento_realizado é sempre NULL.
+    # A estratégia correta é:
+    #   1. Pre-agregar realizado por (conta, empresa, ano, mes) ignorando CC.
+    #   2. Agregar orcado somando todos os CCs por (conta, empresa, mes).
+    #   3. LEFT JOIN pelos campos comuns (conta + empresa + período).
+    # O filtro por CC aplica-se apenas ao orcado (WHERE fo.id_centro_custo).
+    # Lançamentos do SIA não têm centro de custo (MOV_CECT = NULL para todas as empresas),
+    # portanto id_centro_custo em fato_lancamento_realizado é sempre NULL.
+    #
+    # A estratégia correta:
+    #   1. realizado_agg agrega por (conta, ano, mes) SEM empresa e SEM CC.
+    #      O filtro :id_empresa é aplicado aqui para que, quando informado,
+    #      apenas o realizado da empresa selecionada entre na soma.
+    #      Quando NULL, cobre todas as empresas → visão consolidada consistente.
+    #   2. fato_orcamento é filtrado pelo mesmo :id_empresa no WHERE externo.
+    #      SUM(fo.valor) soma todos os CCs da empresa para cada conta-mes.
+    #   3. O JOIN usa somente conta+período (sem empresa), de modo que há
+    #      exatamente uma linha em realizado_agg para cada (conta, mes),
+    #      eliminando o risco de MAX subesticar o realizado multi-empresa.
     sql = text("""
+        WITH realizado_agg AS (
+            SELECT
+                id_conta_gerencial,
+                EXTRACT(YEAR  FROM data_referencia)::int AS ano,
+                EXTRACT(MONTH FROM data_referencia)::int AS mes,
+                SUM(valor * CASE WHEN tipo_lancamento = 'D' THEN 1 ELSE -1 END)
+                    AS valor_realizado
+            FROM dw.fato_lancamento_realizado
+            WHERE id_conta_gerencial IS NOT NULL
+              AND (:id_empresa IS NULL OR id_empresa = :id_empresa)
+            GROUP BY id_conta_gerencial,
+                     EXTRACT(YEAR  FROM data_referencia),
+                     EXTRACT(MONTH FROM data_referencia)
+        )
         SELECT
             fo.mes,
-            cg.codigo   AS conta_gerencial_codigo,
-            cg.nome     AS conta_gerencial_nome,
-            cc.codigo   AS centro_custo_codigo,
-            cc.nome     AS centro_custo_nome,
-            COALESCE(fo.valor, 0)              AS valor_orcado,
-            COALESCE(SUM(lr.valor * CASE WHEN lr.tipo_lancamento = 'D' THEN 1 ELSE -1 END), 0) AS valor_realizado
+            cg.codigo                           AS conta_gerencial_codigo,
+            cg.nome                             AS conta_gerencial_nome,
+            NULL::varchar                        AS centro_custo_codigo,
+            NULL::varchar                        AS centro_custo_nome,
+            SUM(fo.valor)                       AS valor_orcado,
+            COALESCE(MAX(r.valor_realizado), 0) AS valor_realizado
         FROM dw.fato_orcamento fo
         JOIN dw.dim_conta_gerencial cg ON cg.id = fo.id_conta_gerencial
-        JOIN dw.dim_centro_custo    cc ON cc.id = fo.id_centro_custo
-        LEFT JOIN dw.fato_lancamento_realizado lr
-               ON lr.id_conta_gerencial = fo.id_conta_gerencial
-              AND lr.id_centro_custo    = fo.id_centro_custo
-              AND lr.id_empresa         = fo.id_empresa
-              AND EXTRACT(YEAR FROM lr.data_referencia)  = fo.ano
-              AND EXTRACT(MONTH FROM lr.data_referencia) = fo.mes
+        LEFT JOIN realizado_agg r
+               ON  r.id_conta_gerencial = fo.id_conta_gerencial
+              AND  r.ano                = fo.ano
+              AND  r.mes                = fo.mes
         WHERE fo.ano       = :ano
           AND fo.id_versao = :id_versao
-          AND (:id_empresa IS NULL OR fo.id_empresa = :id_empresa)
+          AND (:id_empresa     IS NULL OR fo.id_empresa     = :id_empresa)
           AND (:id_centro_custo IS NULL OR fo.id_centro_custo = :id_centro_custo)
-        GROUP BY fo.mes, cg.codigo, cg.nome, cc.codigo, cc.nome, fo.valor
+        GROUP BY fo.mes, cg.codigo, cg.nome
         ORDER BY fo.mes, cg.codigo
     """)
 

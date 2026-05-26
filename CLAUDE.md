@@ -14,8 +14,8 @@ e acompanhamento Realizado × Orçado. Integra com o ERP System SIA via ETL.
 - **Backend**: Python 3.11 + FastAPI + SQLAlchemy 2 + Alembic
 - **Banco analítico**: PostgreSQL 15 (schemas: `dw` e `app`)
 - **ETL**: Python + pandas + pyodbc (Firebird ODBC para o SIA)
-- **Frontend**: React 18 + TypeScript + Vite + Recharts
-- **BI**: Metabase (open-source, conectado ao schema `dw`)
+- **Frontend**: React 18 + TypeScript + Vite + Recharts + TanStack Query v5
+- **BI**: Metabase v0.50 (open-source, conectado ao schema `dw`)
 - **Deploy**: Docker Compose + Nginx
 
 ---
@@ -38,7 +38,7 @@ No PostgreSQL: sempre `NUMERIC(15,2)`, nunca `FLOAT` ou `REAL`.
 O banco do ERP System SIA nunca pode receber escrita.
 - Nunca usar `INSERT`, `UPDATE`, `DELETE`, `MERGE` no SIA
 - A classe `SIAExtractor` só executa `SELECT`
-- Conexão deve ser feita com `readonly=True` onde suportado
+- Conexão feita com `readonly=True`: `pyodbc.connect(conn_str, autocommit=False, readonly=True)`
 
 ### 3. Secrets no .env — nunca no código
 ```python
@@ -64,7 +64,6 @@ valor = Decimal(str(row["MOV_VALOR"])) / Decimal("100")
 
 Validado em 2026-05 via MCP Firebird. MOV_VALOR, TIT_VAL, TITPAR_VAL
 são todos tipo 16 (NUMERIC) no Firebird — já vêm como decimal.
-Apenas converter para Decimal Python via `sia_decimal()` em `transformer.py`.
 
 ### 6. Joins no SIA — atenção às tabelas sem CODEMP
 ```sql
@@ -78,6 +77,31 @@ WHERE CTB_CCUSTOS.CC_CODCCPL = 3         -- plano "Philozon & Ozoncare"
 
 -- GER_EMITENTES NÃO tem CODEMP — cadastro global de fornecedores
 ```
+
+### 7. NUNCA hardcodar id_empresa = 1
+O `id` de `dim_empresa` é autoincrement do DW — não é previsível.
+Use `useEmpresaAtiva()` no frontend (resolve `VITE_EMPRESA_CODEMP` → `id` via API).
+No backend, receba `id_empresa` como parâmetro de query.
+
+---
+
+## Problemas Resolvidos (histórico para não regredir)
+
+### Bug: `valor_realizado = 0` em todo o comparativo
+**Causa**: `MOV_CECT = NULL` em todos os lançamentos SIA da Philozon.
+O join `ON lr.id_centro_custo = fo.id_centro_custo` nunca casava (NULL ≠ NULL).
+**Fix**: `api/routers/comparativo.py` usa CTE `realizado_agg` que agrega por
+`(conta, empresa, ano, mes)` sem CC. `migrations/004` corrige a view Metabase.
+
+### Bug: dupla contagem multi-empresa no comparativo
+**Causa**: CTE agrupava por `(conta, empresa, mes)`, mas outer GROUP BY não tinha empresa.
+`MAX()` pegava o maior valor de uma empresa em vez de somar todas.
+**Fix**: remover `id_empresa` do GROUP BY do CTE; filtrar empresa no WHERE do CTE.
+Resultado: uma linha por `(conta, mes)`, correta para qualquer combinação de filtro.
+
+### Bug: `ID_EMPRESA_PADRAO = 1` hardcodado
+**Encontrado em**: `Workflow.tsx`, `Orcamento.tsx`, `MapeamentoContas.tsx`, `MapeamentoCentrosCusto.tsx`.
+**Fix**: todos usam `useEmpresaAtiva()` do hook `useDimensoes.ts`.
 
 ---
 
@@ -93,23 +117,43 @@ O PostgreSQL tem dois schemas:
 
 **Dimensões:**
 - `dim_empresa` — empresas (espelha GER_EMPRESAS do SIA)
-- `dim_tempo` — calendário diário
-- `dim_centro_custo` — CCs gerenciais (cadastro interno)
-- `dim_conta_gerencial` — plano de contas gerencial (cadastro interno)
+- `dim_tempo` — calendário diário (gerado pelo transformer, não extraído)
+- `dim_centro_custo` — CCs gerenciais (cadastro interno, via API)
+- `dim_conta_gerencial` — plano de contas gerencial (cadastro interno, via API)
 - `dim_conta_sia` — plano contábil do SIA (espelho, read-only na origem)
 - `dim_versao_orcamento` — versões do orçamento (Original, Revisão, Forecast)
 
 **Fatos:**
 - `fato_lancamento_realizado` — lançamentos contábeis via ETL (nunca inserção manual)
+  - `id_centro_custo` é **sempre NULL** (MOV_CECT = NULL no SIA)
 - `fato_orcamento` — orçamento inserido pelos usuários via API
 - `fato_receita` — receita bruta agregada via ETL
 - `fato_despesa` — despesas agregadas via ETL
 
 **Operacionais:**
-- `workflow_orcamento` — ciclo de aprovação
-- `justificativa_variacao` — justificativas obrigatórias para desvios > threshold
+- `workflow_orcamento` — ciclo de aprovação (RASCUNHO→ENVIADO→APROVADO|REPROVADO)
+- `justificativa_variacao` — justificativas para desvios significativos
 - `mapeamento_conta_sia_gerencial` — de-para contas
 - `mapeamento_centro_custo_sia_gerencial` — de-para centros de custo
+
+**Views (Metabase):**
+- `v_lancamentos_detalhado` — lançamentos desnormalizados
+- `v_comparativo_mensal` — realizado × orçado por mês/conta (corrigida migration 004)
+- `v_evolucao_mensal` — totais mensais por tipo de conta
+- `v_dre_anual` — DRE com hierarquia
+- `v_workflow_resumo` — status de aprovação
+
+---
+
+## Migrations
+
+Sequência atual: `001 → 002 → 003 → 004` (linear, sem branches)
+
+```bash
+alembic upgrade head    # aplicar todas
+alembic downgrade -1    # reverter uma
+alembic current         # ver revisão atual
+```
 
 ---
 
@@ -129,12 +173,14 @@ PostgreSQL DW (schema dw)
 ```bash
 cd etl
 python pipeline.py --ano 2025 --mes 1
+python pipeline.py --ano 2025 --mes 1 --codemp 3  # forçar empresa
 ```
 
-**TODO crítico antes de usar em produção:**
-1. ~~Confirmar nomes reais das colunas~~ — **concluído em 2026-05 (Fase 2)**
-2. ~~Confirmar escala dos campos monetários~~ — **NUMERIC nativo, sem divisão**
-3. Instalar driver Firebird ODBC no servidor/container ETL
+**4 passos por execução:**
+1. `dim_tempo` — gera datas do período (local, sem SIA)
+2. `dim_empresa` — espelho de GER_EMPRESAS
+3. `dim_conta_sia` — espelho de CTB_CONTAS (planos 1 e 2)
+4. `fato_lancamento_realizado` — lançamentos do período com FK resolution
 
 ---
 
@@ -147,7 +193,7 @@ python pipeline.py --ano 2025 --mes 1
 | MOV_NUMLAN | INT | Nº do lançamento (sequencial por empresa/data) |
 | MOV_DATA | DATE | Data de competência |
 | MOV_CODCON | INT | FK → CTB_CONTAS.CON_COD |
-| MOV_CECT | INT/NULL | FK → CTB_CCUSTOS.CC_COD (pode ser NULL) |
+| MOV_CECT | INT/NULL | FK → CTB_CCUSTOS.CC_COD (**SEMPRE NULL na Philozon**) |
 | MOV_TIPO | INT | 1=Débito, 2=Crédito, 3=Encerramento, 4=Transf. |
 | MOV_VALOR | NUMERIC | Valor já decimal (sem divisão por escala) |
 | MOV_HIST | VARCHAR | Histórico do lançamento |
@@ -244,16 +290,6 @@ docker compose logs -f etl
 
 ---
 
-## Próximas Fases
-
-- **Fase 2**: ETL real com conexão Firebird + normalização de escalas
-- **Fase 3**: CRUD completo de mapeamentos via API
-- **Fase 4**: Workflow completo com notificações
-- **Fase 5**: Frontend conectado à API real (substituir dados de exemplo)
-- **Fase 6**: Dashboards Metabase configurados
-
----
-
 ## Convenções de Código
 
 - Sem comentários óbvios — só onde o "porquê" não é evidente
@@ -262,3 +298,20 @@ docker compose logs -f etl
 - SQL raw via `text()` apenas para queries analíticas complexas
 - Para CRUD simples, usar SQLAlchemy ORM
 - TypeScript strict mode no frontend — sem `any`
+- TanStack Query v5 no frontend — `useQuery`, `useMutation`, invalidação de cache
+
+---
+
+## Status das Fases
+
+- [x] **Fase 1**: Schema inicial, migrations 001–002, modelos ORM
+- [x] **Fase 2**: Colunas reais do SIA validadas via MCP Firebird; escala NUMERIC confirmada
+- [x] **Fase 3**: CRUD completo de mapeamentos via API
+- [x] **Fase 4**: Workflow completo com notificações SMTP via BackgroundTasks
+- [x] **Fase 5**: Frontend conectado à API (9 routers, 8 páginas React)
+- [x] **Fase 6**: Views Metabase (migrations 003 + 004)
+- [x] **Fase 7**: Correção bug comparativo CC (migration 004 + api/routers/comparativo.py)
+- [x] **Fase 8**: Documentação completa (README, docs/API, docs/BANCO_DE_DADOS, docs/ETL, docs/DECISOES_TECNICAS)
+- [ ] **Pendente**: Executar ETL em produção para popular `fato_lancamento_realizado`
+- [ ] **Pendente**: Cadastrar mapeamentos conta SIA → gerencial via frontend
+- [ ] **Pendente**: Cadastrar orçamento via frontend para o ano corrente

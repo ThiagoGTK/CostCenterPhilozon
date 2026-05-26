@@ -1,11 +1,9 @@
 import { useState } from "react";
 import { useWorkflows, useIniciarWorkflow, useEnviarWorkflow, useAprovarWorkflow, useReprovarWorkflow } from "../hooks/useWorkflow";
-import { useVersoes } from "../hooks/useDimensoes";
+import { useVersoes, useEmpresaAtiva } from "../hooks/useDimensoes";
 import { WorkflowItem } from "../services/api";
 import styles from "./PageGeneric.module.css";
 import wfStyles from "./Workflow.module.css";
-
-const ID_EMPRESA_PADRAO = 1;
 
 const STATUS_COLORS: Record<string, string> = {
   RASCUNHO: wfStyles.rascunho,
@@ -32,6 +30,8 @@ interface ModalState {
 export default function Workflow() {
   const anoAtual = new Date().getFullYear();
   const [ano, setAno] = useState(anoAtual);
+
+  const { idEmpresa } = useEmpresaAtiva();
 
   // Modal state
   const [modal, setModal] = useState<ModalState>({ tipo: null });
@@ -84,7 +84,7 @@ export default function Workflow() {
         }
         await iniciar.mutateAsync({
           id_versao: Number(idVersaoNova),
-          id_empresa: ID_EMPRESA_PADRAO,
+          id_empresa: idEmpresa!,
           criado_por: nome.trim(),
         });
       } else if (modal.tipo === "enviar" && modal.wfId) {

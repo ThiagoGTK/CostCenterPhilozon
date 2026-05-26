@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useVersoes, useCentrosCusto } from "../hooks/useDimensoes";
+import { useVersoes, useCentrosCusto, useEmpresaAtiva } from "../hooks/useDimensoes";
 import { useComparativo } from "../hooks/useComparativo";
 import { formatCurrency, formatPercent } from "../services/format";
 import styles from "./PageGeneric.module.css";
@@ -19,15 +19,21 @@ export default function Comparativo() {
   const [idVersao, setIdVersao] = useState<number | "">("");
   const [idCC, setIdCC] = useState<number | "">("");
 
+  const { idEmpresa } = useEmpresaAtiva();
   const { data: versoes = [] } = useVersoes(ano);
   const { data: centros = [] } = useCentrosCusto();
 
   const versaoSelecionada = idVersao || versoes[0]?.id;
 
+  const params = {
+    ...(idEmpresa != null ? { id_empresa: idEmpresa } : {}),
+    ...(idCC ? { id_centro_custo: Number(idCC) } : {}),
+  };
+
   const { data: comparativo, isLoading, isError } = useComparativo(
     ano,
     versaoSelecionada || undefined,
-    idCC ? { id_centro_custo: Number(idCC) } : undefined
+    Object.keys(params).length > 0 ? params : undefined
   );
 
   return (

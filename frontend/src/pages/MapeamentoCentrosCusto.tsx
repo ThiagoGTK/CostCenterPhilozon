@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useCentrosCusto } from "../hooks/useDimensoes";
+import { useCentrosCusto, useEmpresaAtiva } from "../hooks/useDimensoes";
 import {
   useMapeamentosCC,
   useCriarMapeamentoCC,
@@ -7,13 +7,12 @@ import {
 } from "../hooks/useMapeamentos";
 import styles from "./PageGeneric.module.css";
 
-const ID_EMPRESA_PADRAO = 1;
-
 export default function MapeamentoCentrosCusto() {
   const [form, setForm] = useState({ cc_sia_codigo: "", cc_sia_nome: "", id_centro_custo_gerencial: "" });
   const [erro, setErro] = useState("");
 
-  const { data: mapeamentos = [], isLoading } = useMapeamentosCC(ID_EMPRESA_PADRAO);
+  const { idEmpresa } = useEmpresaAtiva();
+  const { data: mapeamentos = [], isLoading } = useMapeamentosCC(idEmpresa ?? undefined);
   const { data: centrosGer = [] } = useCentrosCusto();
   const criar = useCriarMapeamentoCC();
   const desativar = useDesativarMapeamentoCC();
@@ -33,7 +32,7 @@ export default function MapeamentoCentrosCusto() {
       await criar.mutateAsync({
         cc_sia_codigo: form.cc_sia_codigo.trim(),
         cc_sia_nome: form.cc_sia_nome.trim() || undefined,
-        id_empresa: ID_EMPRESA_PADRAO,
+        id_empresa: idEmpresa!,
         id_centro_custo_gerencial: Number(form.id_centro_custo_gerencial),
       });
       setForm({ cc_sia_codigo: "", cc_sia_nome: "", id_centro_custo_gerencial: "" });
