@@ -21,6 +21,7 @@ class ETLConfig:
     sia_database: str
     sia_user: str
     sia_password: str
+    sia_role: str
     sia_codemp: int
 
     # ETL
@@ -36,6 +37,7 @@ def load_config() -> ETLConfig:
         sia_database=os.environ["SIA_DATABASE"],
         sia_user=os.environ["SIA_USER"],
         sia_password=os.environ["SIA_PASSWORD"],
+        sia_role=os.getenv("SIA_ROLE", ""),
         sia_codemp=int(os.environ["SIA_CODEMP"]),
         batch_size=int(os.getenv("ETL_BATCH_SIZE", "1000")),
         log_level=os.getenv("ETL_LOG_LEVEL", "INFO"),

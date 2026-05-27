@@ -24,13 +24,16 @@ def _build_sia_connection_string(cfg: ETLConfig) -> str:
     Monta a connection string para o Firebird via ODBC.
     TODO: Ajustar conforme driver instalado (Firebird ODBC / IBPhoenix).
     """
-    return (
-        f"DRIVER={{Firebird/InterBase(r) driver}};"
-        f"DBNAME={cfg.sia_host}/{cfg.sia_port}:{cfg.sia_database};"
-        f"UID={cfg.sia_user};"
-        f"PWD={cfg.sia_password};"
-        "CHARSET=UTF8;"
-    )
+    parts = [
+        "DRIVER={Firebird/InterBase(r) driver}",
+        f"DBNAME={cfg.sia_host}/{cfg.sia_port}:{cfg.sia_database}",
+        f"UID={cfg.sia_user}",
+        f"PWD={cfg.sia_password}",
+        "CHARSET=UTF8",
+    ]
+    if cfg.sia_role:
+        parts.append(f"ROLE={cfg.sia_role}")
+    return ";".join(parts) + ";"
 
 
 class SIAExtractor:

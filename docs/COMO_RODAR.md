@@ -43,10 +43,12 @@ Abra o `.env` e substitua **todos** os campos marcados com `TROCAR`:
 DW_PASSWORD=uma_senha_forte_aqui          # OBRIGATÓRIO
 
 # ── SIA / ERP Firebird (somente leitura) ──────────────────────
-SIA_HOST=192.168.1.100                    # IP do servidor SIA
-SIA_DATABASE=/dados/sia/empresa.fdb       # Caminho do .fdb
-SIA_USER=sysdba
+SIA_HOST=192.168.70.13                    # IP do servidor SIA Firebird
+SIA_PORT=3050                             # Porta padrão Firebird
+SIA_DATABASE=/syspro/bd/sysdb.fbd        # Caminho do .fbd no servidor SIA
+SIA_USER=PHILOZON                         # Usuário do SIA
 SIA_PASSWORD=senha_do_sia                 # OBRIGATÓRIO para o ETL
+SIA_ROLE=RLCONSULTA                       # Role de somente leitura do SIA
 SIA_CODEMP=1                              # EMP_COD da empresa principal
 
 # ── Metabase ───────────────────────────────────────────────────
