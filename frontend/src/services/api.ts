@@ -9,6 +9,25 @@ export const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
+// Injeta token salvo no localStorage em toda requisição
+const token = localStorage.getItem("fpa_token");
+if (token) {
+  api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+}
+
+// Se a API retornar 401, limpa sessão e redireciona para login
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem("fpa_token");
+      localStorage.removeItem("fpa_usuario");
+      window.location.href = "/login";
+    }
+    return Promise.reject(err);
+  }
+);
+
 // ── Tipos ──────────────────────────────────────────────────────────────────
 
 export interface VersaoOrcamento {

@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, extract
+from api.auth.deps import get_current_user
 from api.db import get_db
 from api.models.fatos import FatoLancamentoRealizado
+from api.models.usuario import Usuario
 from decimal import Decimal
 
 router = APIRouter(prefix="/lancamentos", tags=["Lançamentos Realizados"])
@@ -13,6 +15,7 @@ def listar_lancamentos(
     mes_referencia: str,  # formato: YYYY-MM
     id_empresa: int | None = None,
     id_conta_gerencial: int | None = None,
+    _u: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     try:

@@ -7,7 +7,9 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from api.auth.deps import get_current_user
 from api.db import get_db
+from api.models.usuario import Usuario
 from api.schemas.comparativo import ComparativoItem, ComparativoResponse
 
 router = APIRouter(prefix="/comparativo", tags=["Comparativo Realizado × Orçado"])
@@ -19,6 +21,7 @@ def comparativo(
     id_versao: int,
     id_empresa: int | None = None,
     id_centro_custo: int | None = None,
+    _u: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     # Lançamentos do SIA não têm centro de custo (MOV_CECT = NULL para todas as empresas),

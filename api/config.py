@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
 
+    # JWT
+    jwt_algorithm: str = "HS256"
+    jwt_expire_hours: int = 8
+
     # Threshold de variação que exige justificativa (%)
     variacao_threshold_pct: float = 10.0
 

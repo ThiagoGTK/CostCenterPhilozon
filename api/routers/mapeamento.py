@@ -17,9 +17,11 @@ Endpoints:
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 
+from api.auth.deps import get_current_user, require_admin_ou_gestor
 from api.db import get_db
 from api.models.dimensoes import DimContaSia
 from api.models.mapeamentos import MapeamentoContaSia, MapeamentoCentroCusto
+from api.models.usuario import Usuario
 from api.schemas.mapeamento import (
     ContaSiaResumo,
     MapeamentoContaCreate,
@@ -39,6 +41,7 @@ router = APIRouter(tags=["Mapeamentos SIA → Gerencial"])
 def listar_contas_sia(
     codpla: int | None = Query(None, description="Filtrar por plano (1=Philozon 2019, 2=Philozon 2023)"),
     nivel: int | None = Query(None, description="Filtrar por nível hierárquico"),
+    _u: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Lista contas contábeis do SIA já carregadas no DW pelo ETL."""
@@ -56,6 +59,7 @@ def listar_contas_sia(
 def listar_mapeamentos_contas(
     id_empresa: int | None = Query(None),
     apenas_ativos: bool = True,
+    _u: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     q = db.query(MapeamentoContaSia).options(joinedload(MapeamentoContaSia.conta_sia))
@@ -67,7 +71,11 @@ def listar_mapeamentos_contas(
 
 
 @router.post("/mapeamentos/contas", response_model=MapeamentoContaRead, status_code=status.HTTP_201_CREATED)
-def criar_mapeamento_conta(payload: MapeamentoContaCreate, db: Session = Depends(get_db)):
+def criar_mapeamento_conta(
+    payload: MapeamentoContaCreate,
+    _u: Usuario = Depends(require_admin_ou_gestor),
+    db: Session = Depends(get_db),
+):
     # Verifica duplicata ativa
     existente = db.query(MapeamentoContaSia).filter(
         MapeamentoContaSia.id_conta_sia == payload.id_conta_sia,
@@ -90,7 +98,12 @@ def criar_mapeamento_conta(payload: MapeamentoContaCreate, db: Session = Depends
 
 
 @router.put("/mapeamentos/contas/{id}", response_model=MapeamentoContaRead)
-def atualizar_mapeamento_conta(id: int, payload: MapeamentoContaUpdate, db: Session = Depends(get_db)):
+def atualizar_mapeamento_conta(
+    id: int,
+    payload: MapeamentoContaUpdate,
+    _u: Usuario = Depends(require_admin_ou_gestor),
+    db: Session = Depends(get_db),
+):
     obj = db.get(MapeamentoContaSia, id)
     if not obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mapeamento não encontrado")
@@ -104,7 +117,11 @@ def atualizar_mapeamento_conta(id: int, payload: MapeamentoContaUpdate, db: Sess
 
 
 @router.delete("/mapeamentos/contas/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def desativar_mapeamento_conta(id: int, db: Session = Depends(get_db)):
+def desativar_mapeamento_conta(
+    id: int,
+    _u: Usuario = Depends(require_admin_ou_gestor),
+    db: Session = Depends(get_db),
+):
     obj = db.get(MapeamentoContaSia, id)
     if not obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mapeamento não encontrado")
@@ -118,6 +135,7 @@ def desativar_mapeamento_conta(id: int, db: Session = Depends(get_db)):
 def listar_mapeamentos_cc(
     id_empresa: int | None = Query(None),
     apenas_ativos: bool = True,
+    _u: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     q = db.query(MapeamentoCentroCusto)
@@ -129,7 +147,11 @@ def listar_mapeamentos_cc(
 
 
 @router.post("/mapeamentos/centros-custo", response_model=MapeamentoCCRead, status_code=status.HTTP_201_CREATED)
-def criar_mapeamento_cc(payload: MapeamentoCCCreate, db: Session = Depends(get_db)):
+def criar_mapeamento_cc(
+    payload: MapeamentoCCCreate,
+    _u: Usuario = Depends(require_admin_ou_gestor),
+    db: Session = Depends(get_db),
+):
     existente = db.query(MapeamentoCentroCusto).filter(
         MapeamentoCentroCusto.cc_sia_codigo == payload.cc_sia_codigo,
         MapeamentoCentroCusto.id_empresa == payload.id_empresa,
@@ -148,7 +170,12 @@ def criar_mapeamento_cc(payload: MapeamentoCCCreate, db: Session = Depends(get_d
 
 
 @router.put("/mapeamentos/centros-custo/{id}", response_model=MapeamentoCCRead)
-def atualizar_mapeamento_cc(id: int, payload: MapeamentoCCUpdate, db: Session = Depends(get_db)):
+def atualizar_mapeamento_cc(
+    id: int,
+    payload: MapeamentoCCUpdate,
+    _u: Usuario = Depends(require_admin_ou_gestor),
+    db: Session = Depends(get_db),
+):
     obj = db.get(MapeamentoCentroCusto, id)
     if not obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mapeamento não encontrado")
@@ -163,7 +190,11 @@ def atualizar_mapeamento_cc(id: int, payload: MapeamentoCCUpdate, db: Session = 
 
 
 @router.delete("/mapeamentos/centros-custo/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def desativar_mapeamento_cc(id: int, db: Session = Depends(get_db)):
+def desativar_mapeamento_cc(
+    id: int,
+    _u: Usuario = Depends(require_admin_ou_gestor),
+    db: Session = Depends(get_db),
+):
     obj = db.get(MapeamentoCentroCusto, id)
     if not obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mapeamento não encontrado")

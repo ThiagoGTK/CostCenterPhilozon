@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Calculator,
@@ -7,23 +7,58 @@ import {
   ArrowLeftRight,
   FolderTree,
   Settings,
+  Users,
+  LogOut,
 } from "lucide-react";
+import { useAuth, type Perfil } from "../../contexts/AuthContext";
 import styles from "./Sidebar.module.css";
 
-const NAV_ITEMS = [
-  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/orcamento", icon: Calculator, label: "Orçamento" },
-  { to: "/comparativo", icon: BarChart3, label: "Realizado × Orçado" },
-  { to: "/workflow", icon: GitBranch, label: "Aprovações" },
-  { divider: true, label: "Mapeamentos" },
-  { to: "/mapeamento/contas", icon: ArrowLeftRight, label: "Contas SIA → Gerencial" },
-  { to: "/mapeamento/centros-custo", icon: ArrowLeftRight, label: "Centros de Custo" },
-  { divider: true, label: "Cadastros" },
-  { to: "/cadastros/centros-custo", icon: FolderTree, label: "Centros de Custo" },
-  { to: "/cadastros/contas-gerenciais", icon: Settings, label: "Plano Gerencial" },
+interface NavItem {
+  to: string;
+  icon: React.ElementType;
+  label: string;
+  perfisPermitidos?: Perfil[];
+}
+
+interface Divider {
+  divider: true;
+  label: string;
+  perfisPermitidos?: Perfil[];
+}
+
+type Item = NavItem | Divider;
+
+const NAV_ITEMS: Item[] = [
+  { to: "/dashboard",   icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/orcamento",   icon: Calculator,      label: "Orçamento",          perfisPermitidos: ["ADMIN", "GESTOR"] },
+  { to: "/comparativo", icon: BarChart3,        label: "Realizado × Orçado" },
+  { to: "/workflow",    icon: GitBranch,        label: "Aprovações" },
+  { divider: true, label: "Mapeamentos", perfisPermitidos: ["ADMIN", "GESTOR"] },
+  { to: "/mapeamento/contas",        icon: ArrowLeftRight, label: "Contas SIA → Gerencial", perfisPermitidos: ["ADMIN", "GESTOR"] },
+  { to: "/mapeamento/centros-custo", icon: ArrowLeftRight, label: "Centros de Custo",        perfisPermitidos: ["ADMIN", "GESTOR"] },
+  { divider: true, label: "Cadastros", perfisPermitidos: ["ADMIN", "GESTOR"] },
+  { to: "/cadastros/centros-custo",    icon: FolderTree, label: "Centros de Custo",  perfisPermitidos: ["ADMIN", "GESTOR"] },
+  { to: "/cadastros/contas-gerenciais", icon: Settings,  label: "Plano Gerencial",   perfisPermitidos: ["ADMIN", "GESTOR"] },
+  { divider: true, label: "Administração", perfisPermitidos: ["ADMIN"] },
+  { to: "/admin/usuarios", icon: Users, label: "Usuários", perfisPermitidos: ["ADMIN"] },
 ];
 
 export default function Sidebar() {
+  const { usuario, logout } = useAuth();
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    logout();
+    navigate("/login");
+  }
+
+  const perfil = usuario?.perfil as Perfil | undefined;
+
+  function visivel(item: Item): boolean {
+    if (!item.perfisPermitidos) return true;
+    return perfil != null && item.perfisPermitidos.includes(perfil);
+  }
+
   return (
     <aside className={styles.sidebar}>
       <div className={styles.brand}>
@@ -37,6 +72,8 @@ export default function Sidebar() {
 
       <nav className={styles.nav}>
         {NAV_ITEMS.map((item, idx) => {
+          if (!visivel(item)) return null;
+
           if ("divider" in item && item.divider) {
             return (
               <div key={idx} className={styles.section}>
@@ -64,7 +101,15 @@ export default function Sidebar() {
       </nav>
 
       <div className={styles.footer}>
-        v0.1.0 — MVP
+        {usuario && (
+          <div className={styles.userInfo}>
+            <span className={styles.userName}>{usuario.nome}</span>
+            <span className={styles.userPerfil}>{usuario.perfil}</span>
+          </div>
+        )}
+        <button className={styles.btnLogout} onClick={handleLogout} title="Sair">
+          <LogOut size={14} />
+        </button>
       </div>
     </aside>
   );

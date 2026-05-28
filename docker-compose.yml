@@ -61,37 +61,6 @@ services:
     # Para execução via cron, sobrescreva o command:
     # command: ["python", "pipeline.py", "--full-load"]
 
-  metabase:
-    image: metabase/metabase:v0.50.0
-    container_name: fpa_metabase
-    restart: unless-stopped
-    environment:
-      # Banco de metadados do Metabase (separado do DW)
-      MB_DB_TYPE: postgres
-      MB_DB_HOST: db
-      MB_DB_PORT: 5432
-      MB_DB_DBNAME: metabase
-      MB_DB_USER: ${MB_DB_USER:-metabase_user}
-      MB_DB_PASS: ${MB_DB_PASS:?MB_DB_PASS obrigatorio}
-      # URL pública — usada em links de e-mail e compartilhamento
-      MB_SITE_URL: ${MB_SITE_URL:-http://localhost/metabase}
-      MB_EMOJI_IN_LOGS: "false"
-      JAVA_TIMEZONE: America/Sao_Paulo
-    volumes:
-      - fpa_metabase_data:/metabase-data
-    depends_on:
-      db:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 10
-      start_period: 120s
-    networks:
-      - fpa_internal
-      - fpa_external
-
   nginx:
     image: nginx:1.25-alpine
     container_name: fpa_nginx
@@ -104,7 +73,6 @@ services:
       - ./frontend/dist:/usr/share/nginx/html:ro
     depends_on:
       - api
-      - metabase
     networks:
       - fpa_external
 

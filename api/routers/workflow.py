@@ -19,7 +19,9 @@ from datetime import datetime
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from api.auth.deps import get_current_user, require_admin_ou_gestor
 from api.db import get_db
+from api.models.usuario import Usuario
 from api.models.dimensoes import DimEmpresa, DimVersaoOrcamento
 from api.models.workflow import JustificativaVariacao, StatusWorkflow, WorkflowOrcamento
 from api.schemas.workflow import (
@@ -68,6 +70,7 @@ def _enriquecer(wf: WorkflowOrcamento) -> WorkflowListItem:
 @router.get("/", response_model=list[WorkflowListItem])
 def listar_workflows(
     ano: int | None = Query(None, description="Filtrar por ano da versão"),
+    _u: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[WorkflowListItem]:
     q = db.query(WorkflowOrcamento)
@@ -79,12 +82,20 @@ def listar_workflows(
 
 
 @router.get("/{wf_id}", response_model=WorkflowListItem)
-def detalhe_workflow(wf_id: int, db: Session = Depends(get_db)) -> WorkflowListItem:
+def detalhe_workflow(
+    wf_id: int,
+    _u: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> WorkflowListItem:
     return _enriquecer(_get_wf_or_404(wf_id, db))
 
 
 @router.post("/iniciar", response_model=WorkflowListItem, status_code=status.HTTP_201_CREATED)
-def iniciar_workflow(payload: WorkflowIniciar, db: Session = Depends(get_db)) -> WorkflowListItem:
+def iniciar_workflow(
+    payload: WorkflowIniciar,
+    _u: Usuario = Depends(require_admin_ou_gestor),
+    db: Session = Depends(get_db),
+) -> WorkflowListItem:
     """Cria um registro de workflow em status RASCUNHO."""
     versao = db.get(DimVersaoOrcamento, payload.id_versao)
     if not versao:
@@ -135,6 +146,7 @@ def enviar_para_revisao(
     wf_id: int,
     payload: WorkflowEnviar,
     background_tasks: BackgroundTasks,
+    _u: Usuario = Depends(require_admin_ou_gestor),
     db: Session = Depends(get_db),
 ) -> WorkflowListItem:
     """Transição RASCUNHO → ENVIADO. Dispara e-mail para aprovadores em background."""
@@ -164,6 +176,7 @@ def aprovar(
     wf_id: int,
     payload: WorkflowAprovar,
     background_tasks: BackgroundTasks,
+    _u: Usuario = Depends(require_admin_ou_gestor),
     db: Session = Depends(get_db),
 ) -> WorkflowListItem:
     """Transição ENVIADO → APROVADO. Bloqueia versão e envia e-mail."""
@@ -204,6 +217,7 @@ def reprovar(
     wf_id: int,
     payload: WorkflowReprovar,
     background_tasks: BackgroundTasks,
+    _u: Usuario = Depends(require_admin_ou_gestor),
     db: Session = Depends(get_db),
 ) -> WorkflowListItem:
     """Transição ENVIADO → REPROVADO. Envia e-mail com motivo."""
@@ -236,7 +250,11 @@ def reprovar(
 # ── Justificativas ────────────────────────────────────────────────────────────
 
 @router.get("/{wf_id}/justificativas", response_model=list[JustificativaRead])
-def listar_justificativas(wf_id: int, db: Session = Depends(get_db)) -> list[JustificativaRead]:
+def listar_justificativas(
+    wf_id: int,
+    _u: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[JustificativaRead]:
     wf = _get_wf_or_404(wf_id, db)
     return (
         db.query(JustificativaVariacao)
@@ -256,6 +274,7 @@ def listar_justificativas(wf_id: int, db: Session = Depends(get_db)) -> list[Jus
 def criar_justificativa(
     wf_id: int,
     payload: JustificativaCreate,
+    _u: Usuario = Depends(require_admin_ou_gestor),
     db: Session = Depends(get_db),
 ) -> JustificativaRead:
     """Registra justificativa de variação vinculada ao workflow."""

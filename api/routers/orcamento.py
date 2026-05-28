@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
+from api.auth.deps import get_current_user, require_admin_ou_gestor
 from api.db import get_db
 from api.models.dimensoes import DimVersaoOrcamento
 from api.models.fatos import FatoOrcamento
+from api.models.usuario import Usuario
 from api.schemas.orcamento import (
     OrcamentoCreate, OrcamentoRead,
     VersaoOrcamentoCreate, VersaoOrcamentoRead,
@@ -17,7 +19,11 @@ router_versoes = APIRouter(prefix="/versoes-orcamento", tags=["Versões de Orça
 # ── Versões ────────────────────────────────────────────────────────────────
 
 @router_versoes.get("/{ano}", response_model=list[VersaoOrcamentoRead])
-def listar_versoes(ano: int, db: Session = Depends(get_db)):
+def listar_versoes(
+    ano: int,
+    _u: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     return (
         db.query(DimVersaoOrcamento)
         .filter(DimVersaoOrcamento.ano == ano)
@@ -27,7 +33,11 @@ def listar_versoes(ano: int, db: Session = Depends(get_db)):
 
 
 @router_versoes.post("/", response_model=VersaoOrcamentoRead, status_code=status.HTTP_201_CREATED)
-def criar_versao(payload: VersaoOrcamentoCreate, db: Session = Depends(get_db)):
+def criar_versao(
+    payload: VersaoOrcamentoCreate,
+    _u: Usuario = Depends(require_admin_ou_gestor),
+    db: Session = Depends(get_db),
+):
     obj = DimVersaoOrcamento(**payload.model_dump(), data_criacao=date.today())
     db.add(obj)
     db.commit()
@@ -43,6 +53,7 @@ def listar_orcamento(
     id_versao: int,
     id_empresa: int | None = None,
     id_centro_custo: int | None = None,
+    _u: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     q = db.query(FatoOrcamento).filter(
@@ -56,7 +67,11 @@ def listar_orcamento(
 
 
 @router.post("/", response_model=OrcamentoRead, status_code=status.HTTP_201_CREATED)
-def criar_lancamento_orcamento(payload: OrcamentoCreate, db: Session = Depends(get_db)):
+def criar_lancamento_orcamento(
+    payload: OrcamentoCreate,
+    _u: Usuario = Depends(require_admin_ou_gestor),
+    db: Session = Depends(get_db),
+):
     versao = db.get(DimVersaoOrcamento, payload.id_versao)
     if not versao:
         raise HTTPException(status_code=404, detail="Versão de orçamento não encontrada")

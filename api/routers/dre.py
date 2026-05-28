@@ -5,13 +5,21 @@ DRE Gerencial — estrutura hierárquica de contas com realizado e orçado.
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from api.auth.deps import get_current_user
 from api.db import get_db
+from api.models.usuario import Usuario
 
 router = APIRouter(prefix="/dre", tags=["DRE Gerencial"])
 
 
 @router.get("/{ano}/{id_versao}")
-def dre(ano: int, id_versao: int, id_empresa: int | None = None, db: Session = Depends(get_db)):
+def dre(
+    ano: int,
+    id_versao: int,
+    id_empresa: int | None = None,
+    _u: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """
     Retorna DRE hierárquico: receitas, deduções, despesas, EBITDA.
     Agrupado por conta gerencial de nível 1 (cabeçalho) e detalhado por sub-contas.
